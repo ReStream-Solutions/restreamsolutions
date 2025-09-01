@@ -3,7 +3,7 @@ import os
 import requests
 
 from .exceptions import AuthError, APICompatibilityError
-
+from .constants import RESTREAM_HOST
 
 class Communicator:
 
@@ -29,20 +29,33 @@ class BaseInterface:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    @classmethod
+    def _format_url(cls, url, **params) -> str:
+        env = os.environ.get('ENV', 'prod')
+        base_url = os.environ.get('RESTREAM_HOST', RESTREAM_HOST)
+        return f'{base_url}{url}'.format(env=env, **params)
 
     @classmethod
-    def get_model(cls, id: int = None, auth_token: str = None, **kwargs):
+    def get_model(cls, id: int = None, auth_token: str = None, as_json=False, **kwargs):
         current_auth_token = auth_token or os.environ.get("TALLY_AUTH_TOKEN")
-        url = cls._api_url_single_object.format(id=id)
+        url = cls._format_url(cls._api_url_single_object, id=id)
         json_response = Communicator.send_get_request(url, current_auth_token, **kwargs)
+        if as_json:
+            return json_response
         if not isinstance(json_response, dict):
             raise APICompatibilityError(f"Expected a JSON object for a single model, but received: {json_response}")
         return cls(id=id, auth_token=auth_token, **json_response)
 
     @classmethod
-    def get_models(cls, auth_token: str = None, **kwargs):
+    def get_models(cls, auth_token: str = None, as_json=False, **kwargs):
         current_auth_token = auth_token or os.environ.get("TALLY_AUTH_TOKEN")
-        json_response = Communicator.send_get_request(cls._api_url_multiple_objects, current_auth_token, **kwargs)
+        url = cls._format_url(cls._api_url_multiple_objects)
+        json_response = Communicator.send_get_request(url, current_auth_token, **kwargs)
+        if as_json:
+            return json_response
         if not isinstance(json_response, list) or not all(isinstance(o, dict) for o in json_response):
             raise APICompatibilityError(f"Expected a JSON array, but received: {json_response}")
         return [cls(auth_token=auth_token, **json_object) for json_object in json_response]
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id={self.id})"
