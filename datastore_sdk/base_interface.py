@@ -1,5 +1,8 @@
 import os
+from datetime import datetime
+from typing import get_type_hints
 
+from dateutil import parser
 import requests
 import httpx
 
@@ -38,8 +41,9 @@ class BaseInterface:
     def __init__(self, id: int, auth_token: str = None, **kwargs):
         self.id = id
         self._auth_token = auth_token
+        self._hints = get_type_hints(self.__class__)
         for key, value in kwargs.items():
-            setattr(self, key, value)
+            setattr(self, key, self._try_convert_value(key, value))
 
     @classmethod
     def _format_url(cls, url, **params) -> str:
@@ -67,6 +71,20 @@ class BaseInterface:
         if not isinstance(json_response, list) or not all(isinstance(o, dict) for o in json_response):
             raise APICompatibilityError(f"Expected a JSON array, but received: {json_response}")
         return [cls(auth_token=auth_token, **json_object) for json_object in json_response]
+
+    def _try_convert_value(self, key, value):
+        # TODO: Reimplement using pydantic
+        if value is None:
+            return None
+        if key in self._hints and not isinstance(value, self._hints[key]):
+            try:
+                if self._hints[key] == datetime:
+                    return parser.parse(str(value), ignoretz=False)
+                return self._hints[key](value)
+            except TypeError:
+                raise APICompatibilityError(f"Can not convert {key}={value}: to {self._hints[key]}")
+        return value
+
 
     @classmethod
     def get_model(cls, id: int = None, auth_token: str = None, as_json=False, **kwargs):
@@ -99,12 +117,12 @@ class BaseInterface:
     def update(self):
         updated_json = self.get_model(id=self.id, as_json=True)
         for key, value in updated_json.items():
-            setattr(self, key, value)
+            setattr(self, key, self._try_convert_value(key, value))
 
     async def aupdate(self):
         updated_json = await self.aget_model(id=self.id, as_json=True)
         for key, value in updated_json.items():
-            setattr(self, key, value)
+            setattr(self, key, self._try_convert_value(key, value))
 
     def __repr__(self):
         return f"{self.__class__.__name__}(id={self.id})"
