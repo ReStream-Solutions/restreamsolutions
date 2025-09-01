@@ -1,0 +1,28 @@
+import requests
+import httpx
+
+from .exceptions import AuthError
+
+
+class Communicator:
+
+    @staticmethod
+    def send_get_request(url: str, auth_token: str, **params) -> dict | list:
+        bearer_token = f'Bearer {auth_token}'
+        headers = {"Authorization": bearer_token} if auth_token else None
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 401:
+            raise AuthError()
+        response.raise_for_status()
+        return response.json()
+
+    @staticmethod
+    async def send_get_request_async(url: str, auth_token: str, **params) -> dict | list:
+        bearer_token = f'Bearer {auth_token}'
+        headers = {"Authorization": bearer_token} if auth_token else None
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, headers=headers)
+        if response.status_code == 401:
+            raise AuthError()
+        response.raise_for_status()
+        return response.json()

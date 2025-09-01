@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "datastore-sdk"
 version = "0.1.0"
-description = "SDK for Tally datastore"
-authors = ["Tally Team <devnull@example.com>"]
+description = "Tally's Datastore SDK"
+authors = ["Riley Seaman <rileyseaman.com>", "Steven Brotherton <sbrotherton@restreamsolutions.com>", "Artem Prokopenko <aprokopenko@restreamsolutions.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [
