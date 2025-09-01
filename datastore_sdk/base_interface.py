@@ -96,5 +96,15 @@ class BaseInterface:
         json_response = await Communicator.send_get_request_async(url, current_auth_token, **kwargs)
         return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_json=as_json)
 
+    def update(self):
+        updated_json = self.get_model(id=self.id, as_json=True)
+        for key, value in updated_json.items():
+            setattr(self, key, value)
+
+    async def aupdate(self):
+        updated_json = await self.aget_model(id=self.id, as_json=True)
+        for key, value in updated_json.items():
+            setattr(self, key, value)
+
     def __repr__(self):
         return f"{self.__class__.__name__}(id={self.id})"
