@@ -2,13 +2,18 @@ import os
 
 import requests
 
+from .exceptions import AuthError, APICompatibilityError
+
 
 class Communicator:
 
     @staticmethod
     def send_get_request(url: str, auth_token: str, **params) -> dict | list:
         bearer_token = f'Bearer {auth_token}'
-        response = requests.get(url, params=params, auth=bearer_token)
+        headers = {"Authorization": bearer_token} if auth_token else None
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 401:
+            raise AuthError()
         response.raise_for_status()
         return response.json()
 
@@ -30,14 +35,14 @@ class BaseInterface:
         current_auth_token = auth_token or os.environ.get("TALLY_AUTH_TOKEN")
         url = cls._api_url_single_object.format(id=id)
         json_response = Communicator.send_get_request(url, current_auth_token, **kwargs)
-        if not json_response is dict:
-            raise TypeError
+        if not isinstance(json_response, dict):
+            raise APICompatibilityError(f"Expected a JSON object for a single model, but received: {json_response}")
         return cls(id=id, auth_token=auth_token, **json_response)
 
     @classmethod
     def get_models(cls, auth_token: str = None, **kwargs):
         current_auth_token = auth_token or os.environ.get("TALLY_AUTH_TOKEN")
         json_response = Communicator.send_get_request(cls._api_url_multiple_objects, current_auth_token, **kwargs)
-        if not json_response is list or not all([o is dict for o in json_response]):
-            raise TypeError
+        if not isinstance(json_response, list) or not all(isinstance(o, dict) for o in json_response):
+            raise APICompatibilityError(f"Expected a JSON array, but received: {json_response}")
         return [cls(auth_token=auth_token, **json_object) for json_object in json_response]
