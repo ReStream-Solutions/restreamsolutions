@@ -26,14 +26,16 @@ class Site(BaseInterface):
 
     def get_state(self, as_json: bool = False) -> Optional['State']:
         from .state import State
-        states = State.get_models(as_json=as_json, site__id=self.id)
+        auth_token = self._auth_token if self._auth_token else None
+        states = State.get_models(auth_token=auth_token, as_json=as_json, site__id=self.id)
         if not states:
             return None
         return states[0]
 
     async def aget_state(self, as_json: bool = False) -> Optional['State']:
         from .state import State
-        states = await State.aget_models(as_json=as_json, site__id=self.id)
+        auth_token = self._auth_token if self._auth_token else None
+        states = await State.aget_models(auth_token=auth_token, as_json=as_json, site__id=self.id)
         if not states:
             return None
         return states[0]
@@ -44,7 +46,8 @@ class Site(BaseInterface):
             self.update()
         if getattr(self, 'pad_id') is None:
             return None
-        return Pad.get_model(id=self.pad_id, as_json=as_json)
+        auth_token = self._auth_token if self._auth_token else None
+        return Pad.get_model(id=self.pad_id, auth_token=auth_token, as_json=as_json)
 
     async def aget_pad(self, as_json: bool = False) -> Optional['Pad']:
         from .pad import Pad
@@ -52,4 +55,5 @@ class Site(BaseInterface):
             await self.aupdate()
         if getattr(self, 'pad_id') is None:
             return None
-        return await Pad.aget_model(id=self.pad_id, as_json=as_json)
+        auth_token = self._auth_token if self._auth_token else None
+        return await Pad.aget_model(id=self.pad_id, auth_token=auth_token, as_json=as_json)
