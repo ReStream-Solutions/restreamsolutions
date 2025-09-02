@@ -20,7 +20,7 @@ class Communicator:
     async def send_get_request_async(url: str, auth_token: str, **params) -> dict | list:
         bearer_token = f'Bearer {auth_token}'
         headers = {"Authorization": bearer_token} if auth_token else None
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             response = await client.get(url, params=params, headers=headers)
         if response.status_code == 401:
             raise AuthError()
