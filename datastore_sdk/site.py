@@ -37,3 +37,19 @@ class Site(BaseInterface):
         if not states:
             return None
         return states[0]
+
+    def get_pad(self, as_json: bool = False) -> Optional['Pad']:
+        from .pad import Pad
+        if not hasattr(self, 'pad_id'):
+            self.update()
+        if getattr(self, 'pad_id') is None:
+            return None
+        return Pad.get_model(id=self.pad_id, as_json=as_json)
+
+    async def aget_pad(self, as_json: bool = False) -> Optional['Pad']:
+        from .pad import Pad
+        if not hasattr(self, 'pad_id'):
+            await self.aupdate()
+        if getattr(self, 'pad_id') is None:
+            return None
+        return await Pad.aget_model(id=self.pad_id, as_json=as_json)
