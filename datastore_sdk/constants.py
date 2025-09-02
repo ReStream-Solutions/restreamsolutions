@@ -9,3 +9,8 @@ class ENDPOINTS(Enum):
     pads_get_many = '/external/thirdparty/v1/pads/'
     states_get_one = '/external/thirdparty/v1/states/{id}/'
     states_get_many = '/external/thirdparty/v1/states/'
+
+class StageNameFilter(Enum):
+    FRAC = 'frac'
+    WIRELINE = 'wl'
+    STANDBY = 'standby'

@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from datastore_sdk import StageNameFilter
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.constants import ENDPOINTS
 
@@ -24,3 +25,16 @@ class State(BaseInterface):
     last_state_update_system_time: datetime
     last_state_confirmation_time: datetime
     previous_state: int
+
+    @classmethod
+    def get_models(
+            cls,
+            stage_name_filter: StageNameFilter = None,
+            auth_token: str = None,
+            as_dict=False,
+            **filters
+    ) -> list['State']:
+
+        if stage_name_filter is not None:
+            filters = {**filters, 'current_state_search': stage_name_filter.value}
+        return super().get_models(auth_token=auth_token, as_dict=as_dict, **filters)
