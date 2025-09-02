@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.constants import ENDPOINTS
@@ -22,3 +23,17 @@ class Site(BaseInterface):
     is_demo_site: bool
     stage_total: int
     timezone: str
+
+    def get_state(self, as_json: bool = False) -> Optional['State']:
+        from .state import State
+        states = State.get_models(as_json=as_json, site__id=self.id)
+        if not states:
+            return None
+        return states[0]
+
+    async def aget_state(self, as_json: bool = False) -> Optional['State']:
+        from .state import State
+        states = await State.aget_models(as_json=as_json, site__id=self.id)
+        if not states:
+            return None
+        return states[0]
