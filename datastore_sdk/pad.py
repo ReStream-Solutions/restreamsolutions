@@ -16,26 +16,26 @@ class Pad(BaseInterface):
     completion_date: datetime
     wireline_enabled: bool
 
-    def get_sites(self, as_json=True, **filters) -> list['Site']:
+    def get_sites(self, as_dict=True, **filters) -> list['Site']:
         from .site import Site
         auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
-        return Site.get_models(auth_token=auth_token, as_json=as_json, **final_filters)
+        return Site.get_models(auth_token=auth_token, as_dict=as_dict, **final_filters)
 
-    async def aget_sites(self, as_json=True, **filters) -> list['Site']:
+    async def aget_sites(self, as_dict=True, **filters) -> list['Site']:
         from .site import Site
         auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
-        return await Site.aget_models(auth_token=auth_token, as_json=as_json, **final_filters)
+        return await Site.aget_models(auth_token=auth_token, as_dict=as_dict, **final_filters)
 
-    def get_states(self, as_json=True, **filters) -> list['State']:
+    def get_states(self, as_dict=True, **filters) -> list['State']:
         from .state import State
         auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
-        return State.get_models(auth_token=auth_token, as_json=as_json, **final_filters)
+        return State.get_models(auth_token=auth_token, as_dict=as_dict, **final_filters)
 
-    async def aget_states(self, as_json=True, **filters) -> list['State']:
+    async def aget_states(self, as_dict=True, **filters) -> list['State']:
         from .state import State
         auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
-        return await State.aget_models(auth_token=auth_token, as_json=as_json, **final_filters)
+        return await State.aget_models(auth_token=auth_token, as_dict=as_dict, **final_filters)

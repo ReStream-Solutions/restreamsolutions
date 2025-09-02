@@ -24,36 +24,36 @@ class Site(BaseInterface):
     stage_total: int
     timezone: str
 
-    def get_state(self, as_json: bool = False) -> Optional['State']:
+    def get_state(self, as_dict: bool = False) -> Optional['State']:
         from .state import State
         auth_token = self._auth_token if self._auth_token else None
-        states = State.get_models(auth_token=auth_token, as_json=as_json, site__id=self.id)
+        states = State.get_models(auth_token=auth_token, as_dict=as_dict, site__id=self.id)
         if not states:
             return None
         return states[0]
 
-    async def aget_state(self, as_json: bool = False) -> Optional['State']:
+    async def aget_state(self, as_dict: bool = False) -> Optional['State']:
         from .state import State
         auth_token = self._auth_token if self._auth_token else None
-        states = await State.aget_models(auth_token=auth_token, as_json=as_json, site__id=self.id)
+        states = await State.aget_models(auth_token=auth_token, as_dict=as_dict, site__id=self.id)
         if not states:
             return None
         return states[0]
 
-    def get_pad(self, as_json: bool = False) -> Optional['Pad']:
+    def get_pad(self, as_dict: bool = False) -> Optional['Pad']:
         from .pad import Pad
         if not hasattr(self, 'pad_id'):
             self.update()
         if getattr(self, 'pad_id') is None:
             return None
         auth_token = self._auth_token if self._auth_token else None
-        return Pad.get_model(id=self.pad_id, auth_token=auth_token, as_json=as_json)
+        return Pad.get_model(id=self.pad_id, auth_token=auth_token, as_dict=as_dict)
 
-    async def aget_pad(self, as_json: bool = False) -> Optional['Pad']:
+    async def aget_pad(self, as_dict: bool = False) -> Optional['Pad']:
         from .pad import Pad
         if not hasattr(self, 'pad_id'):
             await self.aupdate()
         if getattr(self, 'pad_id') is None:
             return None
         auth_token = self._auth_token if self._auth_token else None
-        return await Pad.aget_model(id=self.pad_id, auth_token=auth_token, as_json=as_json)
+        return await Pad.aget_model(id=self.pad_id, auth_token=auth_token, as_dict=as_dict)

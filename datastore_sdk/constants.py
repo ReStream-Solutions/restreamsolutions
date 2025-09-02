@@ -1,6 +1,6 @@
 from enum import Enum
 
-RESTREAM_HOST = 'https://admin.{env}.restreamsolutions.com'
+RESTREAM_HOST = 'https://app.restreamsolutions.com'
 
 class ENDPOINTS(Enum):
     sites_get_one = '/external/thirdparty/v1/sites/{id}/'

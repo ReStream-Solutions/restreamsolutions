@@ -26,11 +26,11 @@ from datastore_sdk import Pad
 
 os.environ["TALLY_AUTH_TOKEN"] = "your token"
 
-Pad.get_models(as_json=True)
+Pad.get_models(as_dict=True)
 ```
 
 - The `TALLY_AUTH_TOKEN` environment variable must contain your Tally access token.
-- The `Pad.get_models` method returns the list of available models; passing `as_json=True` returns JSON-serializable structures.
+- The `Pad.get_models` method returns the list of available models; passing `as_dict=True` returns JSON-serializable structures.
 
 ## Examples
 

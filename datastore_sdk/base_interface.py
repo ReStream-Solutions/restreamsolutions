@@ -24,14 +24,12 @@ class BaseInterface:
 
     @classmethod
     def _format_url(cls, url, **params) -> str:
-        env = os.environ.get('ENV', 'prod')
         base_url = os.environ.get('RESTREAM_HOST', RESTREAM_HOST)
-        return f'{base_url}{url}'.format(env=env, **params)
+        return f'{base_url}{url}'.format(**params)
 
-    # Shared builders to ensure code reuse between sync/async methods
     @classmethod
-    def _build_single_from_response(cls, json_response, id: int, auth_token: str, as_json: bool):
-        if as_json:
+    def _build_single_from_response(cls, json_response, id: int, auth_token: str, as_dict: bool):
+        if as_dict:
             return json_response
         if not isinstance(json_response, dict):
             raise APICompatibilityError(f"Expected a JSON object for a single model, but received: {json_response}")
@@ -42,8 +40,8 @@ class BaseInterface:
         return auth_token or os.environ.get("TALLY_AUTH_TOKEN")
 
     @classmethod
-    def _build_multiple_from_response(cls, json_response, auth_token: str, as_json: bool):
-        if as_json:
+    def _build_multiple_from_response(cls, json_response, auth_token: str, as_dict: bool):
+        if as_dict:
             return json_response
         if not isinstance(json_response, list) or not all(isinstance(o, dict) for o in json_response):
             raise APICompatibilityError(f"Expected a JSON array, but received: {json_response}")
@@ -66,40 +64,40 @@ class BaseInterface:
 
 
     @classmethod
-    def get_model(cls, id: int = None, auth_token: str = None, as_json=False, **filters):
+    def get_model(cls, id: int = None, auth_token: str = None, as_dict=False, **filters):
         current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_single_object, id=id)
         json_response = Communicator.send_get_request(url, current_auth_token, **filters)
-        return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_json=as_json)
+        return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
-    def get_models(cls, auth_token: str = None, as_json=False, **filters):
+    def get_models(cls, auth_token: str = None, as_dict=False, **filters):
         current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_multiple_objects)
         json_response = Communicator.send_get_request(url, current_auth_token, **filters)
-        return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_json=as_json)
+        return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
-    async def aget_model(cls, id: int = None, auth_token: str = None, as_json=False, **filters):
+    async def aget_model(cls, id: int = None, auth_token: str = None, as_dict=False, **filters):
         current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_single_object, id=id)
         json_response = await Communicator.send_get_request_async(url, current_auth_token, **filters)
-        return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_json=as_json)
+        return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
-    async def aget_models(cls, auth_token: str = None, as_json=False, **filters):
+    async def aget_models(cls, auth_token: str = None, as_dict=False, **filters):
         current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_multiple_objects)
         json_response = await Communicator.send_get_request_async(url, current_auth_token, **filters)
-        return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_json=as_json)
+        return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_dict=as_dict)
 
     def update(self):
-        updated_json = self.get_model(id=self.id, as_json=True)
+        updated_json = self.get_model(id=self.id, as_dict=True)
         for key, value in updated_json.items():
             setattr(self, key, self._try_convert_value(key, value))
 
     async def aupdate(self):
-        updated_json = await self.aget_model(id=self.id, as_json=True)
+        updated_json = await self.aget_model(id=self.id, as_dict=True)
         for key, value in updated_json.items():
             setattr(self, key, self._try_convert_value(key, value))
 
