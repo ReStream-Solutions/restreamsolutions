@@ -64,31 +64,31 @@ class BaseInterface:
 
 
     @classmethod
-    def get_model(cls, id: int = None, auth_token: str = None, as_json=False, **kwargs):
+    def get_model(cls, id: int = None, auth_token: str = None, as_json=False, **filters):
         current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_single_object, id=id)
-        json_response = Communicator.send_get_request(url, current_auth_token, **kwargs)
+        json_response = Communicator.send_get_request(url, current_auth_token, **filters)
         return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_json=as_json)
 
     @classmethod
-    def get_models(cls, auth_token: str = None, as_json=False, **kwargs):
+    def get_models(cls, auth_token: str = None, as_json=False, **filters):
         current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_multiple_objects)
-        json_response = Communicator.send_get_request(url, current_auth_token, **kwargs)
+        json_response = Communicator.send_get_request(url, current_auth_token, **filters)
         return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_json=as_json)
 
     @classmethod
-    async def aget_model(cls, id: int = None, auth_token: str = None, as_json=False, **kwargs):
+    async def aget_model(cls, id: int = None, auth_token: str = None, as_json=False, **filters):
         current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_single_object, id=id)
-        json_response = await Communicator.send_get_request_async(url, current_auth_token, **kwargs)
+        json_response = await Communicator.send_get_request_async(url, current_auth_token, **filters)
         return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_json=as_json)
 
     @classmethod
-    async def aget_models(cls, auth_token: str = None, as_json=False, **kwargs):
+    async def aget_models(cls, auth_token: str = None, as_json=False, **filters):
         current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_multiple_objects)
-        json_response = await Communicator.send_get_request_async(url, current_auth_token, **kwargs)
+        json_response = await Communicator.send_get_request_async(url, current_auth_token, **filters)
         return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_json=as_json)
 
     def update(self):
