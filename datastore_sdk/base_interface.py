@@ -57,6 +57,8 @@ class BaseInterface:
             try:
                 if self._hints[key] == datetime:
                     return parser.parse(str(value), ignoretz=False)
+                if issubclass(self._hints[key], BaseInterface) and isinstance(value, dict):
+                    return self._hints[key](**value)
                 return self._hints[key](value)
             except TypeError:
                 raise APICompatibilityError(f"Can not convert {key}={value}: to {self._hints[key]}")

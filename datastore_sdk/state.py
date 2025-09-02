@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from datastore_sdk import Site
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.constants import ENDPOINTS
 
@@ -8,7 +9,7 @@ class State(BaseInterface):
     _api_url_single_object: str = ENDPOINTS.states_get_one.value
     _api_url_multiple_objects: str = ENDPOINTS.states_get_many.value
 
-    site: dict
+    site: Site
     site_component_configuration: dict
     truth_table: dict
     current_state: str
