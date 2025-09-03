@@ -43,6 +43,30 @@ class Pad(BaseInterface):
         final_filters = {**filters, 'pad__id': self.id}
         return await State.aget_models(stage_name_filter=stage_name_filter, auth_token=auth_token, as_dict=as_dict, **final_filters)
 
+    def get_stages_metadata(
+            self,
+            start: datetime = None,
+            end: datetime = None,
+            stage_number: int = None,
+            stage_name_filter: StageNameFilter = None,
+            **filters) -> list[dict[str, Any]]:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(ENDPOINTS.stages_for_pad.value, id=self.id)
+        filters = self._mix_stage_metadata_filters(start, end, stage_number, stage_name_filter, **filters)
+        return Communicator.send_get_request(url, auth_token, **filters)
+
+    async def aget_stages_metadata(
+            self,
+            start: datetime = None,
+            end: datetime = None,
+            stage_number: int = None,
+            stage_name_filter: StageNameFilter = None,
+            **filters) -> list[dict[str, Any]]:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(ENDPOINTS.stages_for_pad.value, id=self.id)
+        filters = self._mix_stage_metadata_filters(start, end, stage_number, stage_name_filter, **filters)
+        return await Communicator.send_get_request_async(url, auth_token, **filters)
+
     def get_fields_metadata(self, **filters) -> list[dict[str, Any]]:
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(ENDPOINTS.fields_for_pad.value, id=self.id)

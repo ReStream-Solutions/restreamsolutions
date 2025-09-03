@@ -3,7 +3,7 @@ from typing import Optional, Any
 
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.communicator import Communicator
-from datastore_sdk.constants import ENDPOINTS
+from datastore_sdk.constants import ENDPOINTS, StageNameFilter
 
 
 class Site(BaseInterface):
@@ -40,6 +40,30 @@ class Site(BaseInterface):
         if not states:
             return None
         return states[0]
+
+    def get_stages_metadata(
+            self,
+            start: datetime = None,
+            end: datetime = None,
+            stage_number: int = None,
+            stage_name_filter: StageNameFilter = None,
+            **filters) -> list[dict[str, Any]]:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(ENDPOINTS.stages_for_site.value, id=self.id)
+        filters = self._mix_stage_metadata_filters(start, end, stage_number, stage_name_filter, **filters)
+        return Communicator.send_get_request(url, auth_token, **filters)
+
+    async def aget_stages_metadata(
+            self,
+            start: datetime = None,
+            end: datetime = None,
+            stage_number: int = None,
+            stage_name_filter: StageNameFilter = None,
+            **filters) -> list[dict[str, Any]]:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(ENDPOINTS.stages_for_site.value, id=self.id)
+        filters = self._mix_stage_metadata_filters(start, end, stage_number, stage_name_filter, **filters)
+        return await Communicator.send_get_request_async(url, auth_token, **filters)
 
     def get_pad(self, as_dict: bool = False) -> Optional['Pad']:
         from .pad import Pad

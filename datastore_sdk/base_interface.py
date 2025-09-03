@@ -1,11 +1,11 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import get_type_hints
 
 from dateutil import parser
 
 from .exceptions import APICompatibilityError
-from .constants import RESTREAM_HOST
+from .constants import RESTREAM_HOST, StageNameFilter
 from .communicator import Communicator
 
 
@@ -62,6 +62,24 @@ class BaseInterface:
                 raise APICompatibilityError(f"Can not convert {key}={value}: to {self._hints[key]}")
         return value
 
+    def _mix_stage_metadata_filters(self,
+            start: datetime = None,
+            end: datetime = None,
+            stage_number: int = None,
+            stage_name_filter: StageNameFilter = None,
+            **filters) -> dict[str, int | str]:
+        filters = filters.copy()
+        if start:
+            start_utc = start.astimezone(timezone.utc)
+            filters['start'] = start_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        if end:
+            end_utc = end.astimezone(timezone.utc)
+            filters['end'] = end_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        if stage_number:
+            filters['stage_number'] = stage_number
+        if stage_name_filter:
+            filters['state'] = stage_name_filter.value
+        return filters
 
     @classmethod
     def get_model(cls, id: int = None, auth_token: str = None, as_dict=False, **filters):
