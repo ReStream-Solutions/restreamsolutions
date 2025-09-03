@@ -1,7 +1,7 @@
 import requests
 import httpx
 
-from .exceptions import AuthError
+from .exceptions import AuthError, APICompatibilityError
 
 
 class Communicator:
@@ -11,8 +11,10 @@ class Communicator:
         bearer_token = f'Bearer {auth_token}'
         headers = {"Authorization": bearer_token} if auth_token else None
         response = requests.get(url, params=params, headers=headers)
-        if response.status_code == 401:
+        if response.status_code in [401, 403]:
             raise AuthError()
+        if response.status_code == 404:
+            raise APICompatibilityError("The endpoint does not exist")
         response.raise_for_status()
         return response.json()
 
