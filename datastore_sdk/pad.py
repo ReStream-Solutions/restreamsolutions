@@ -1,7 +1,9 @@
 from datetime import datetime
+from typing import Any
 
 from datastore_sdk import StageNameFilter
 from datastore_sdk.base_interface import BaseInterface
+from datastore_sdk.communicator import Communicator
 from datastore_sdk.constants import ENDPOINTS
 
 
@@ -40,3 +42,13 @@ class Pad(BaseInterface):
         auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
         return await State.aget_models(stage_name_filter=stage_name_filter, auth_token=auth_token, as_dict=as_dict, **final_filters)
+
+    def get_fields_metadata(self, **filters) -> list[dict[str, Any]]:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(ENDPOINTS.fields_for_pad.value, id=self.id)
+        return Communicator.send_get_request(url, auth_token, **filters)
+
+    async def aget_fields_metadata(self, **filters) -> list[dict[str, Any]]:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(ENDPOINTS.fields_for_pad.value, id=self.id)
+        return await Communicator.send_get_request_async(url, auth_token, **filters)
