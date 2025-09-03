@@ -4,6 +4,7 @@ from typing import Optional, Any
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.communicator import Communicator
 from datastore_sdk.constants import ENDPOINTS, StageNameFilter
+from datastore_sdk.exceptions import APICompatibilityError
 
 
 class Site(BaseInterface):
@@ -92,3 +93,28 @@ class Site(BaseInterface):
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(ENDPOINTS.fields_for_site.value, id=self.id)
         return await Communicator.send_get_request_async(url, auth_token, **filters)
+
+    def _extract_site_measurement_sources(self, pad_measurement_sources: dict) -> dict:
+        if not pad_measurement_sources:
+            return {}
+        site_measurement_sources = {}
+        try:
+            for name, sources_list in pad_measurement_sources.items():
+                site_measurement_sources[name] = []
+                for source in sources_list:
+                    if self.id in source['attached_sites']:
+                        source.pop('attached_sites')
+                        site_measurement_sources[name].append(source)
+            return site_measurement_sources
+        except KeyError as e:
+            raise APICompatibilityError(f"API compatibility error: {e}")
+
+    def get_measurement_sources_metadata(self) -> dict:
+        pad = self.get_pad()
+        pad_measurement_sources = pad.get_measurement_sources_metadata()
+        return self._extract_site_measurement_sources(pad_measurement_sources)
+
+    async def aget_measurement_sources_metadata(self) -> dict:
+        pad = await self.aget_pad()
+        pad_measurement_sources = await pad.aget_measurement_sources_metadata()
+        return self._extract_site_measurement_sources(pad_measurement_sources)

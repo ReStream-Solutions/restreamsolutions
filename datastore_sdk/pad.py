@@ -87,12 +87,12 @@ class Pad(BaseInterface):
         except KeyError:
             raise APICompatibilityError("measurement_sources section not found.")
 
-    def get_measurement_sources(self) -> dict:
+    def get_measurement_sources_metadata(self) -> dict:
         if not hasattr(self, 'simops_config'):
             self.update()
         return self._get_measurement_sources()
 
-    async def aget_measurement_sources(self) -> dict:
+    async def aget_measurement_sources_metadata(self) -> dict:
         if not hasattr(self, 'simops_config'):
             await self.aupdate()
         return self._get_measurement_sources()
