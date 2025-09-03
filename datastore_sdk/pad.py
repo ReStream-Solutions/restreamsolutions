@@ -5,6 +5,7 @@ from datastore_sdk import StageNameFilter
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.communicator import Communicator
 from datastore_sdk.constants import ENDPOINTS
+from datastore_sdk.exceptions import APICompatibilityError
 
 
 class Pad(BaseInterface):
@@ -76,3 +77,22 @@ class Pad(BaseInterface):
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(ENDPOINTS.fields_for_pad.value, id=self.id)
         return await Communicator.send_get_request_async(url, auth_token, **filters)
+
+
+    def _get_measurement_sources(self) -> dict:
+        if getattr(self, 'simops_config') is None:
+            return {}
+        try:
+            return self.simops_config['measurement_sources']
+        except KeyError:
+            raise APICompatibilityError("measurement_sources section not found.")
+
+    def get_measurement_sources(self) -> dict:
+        if not hasattr(self, 'simops_config'):
+            self.update()
+        return self._get_measurement_sources()
+
+    async def aget_measurement_sources(self) -> dict:
+        if not hasattr(self, 'simops_config'):
+            await self.aupdate()
+        return self._get_measurement_sources()
