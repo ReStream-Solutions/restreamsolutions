@@ -13,6 +13,8 @@ class ENDPOINTS(Enum):
     fields_for_site = '/external/thirdparty/v1/sites/{id}/fields/'
     stages_for_pad = '/external/thirdparty/v1/pads/{id}/history/'
     stages_for_site = '/external/thirdparty/v1/sites/{id}/history/'
+    aggregations_for_pad = '/external/thirdparty/v1/pads/{id}/aggregations/'
+    aggregations_for_site = '/external/thirdparty/v1/sites/{id}/aggregations/'
 
 class StageNameFilter(Enum):
     FRAC = 'frac'
