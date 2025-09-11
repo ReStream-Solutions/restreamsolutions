@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from datastore_sdk import StageNameFilter
+from datastore_sdk import StageNameFilters
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.constants import ENDPOINTS
 
@@ -29,7 +29,7 @@ class State(BaseInterface):
     @classmethod
     def get_models(
             cls,
-            stage_name_filter: StageNameFilter = None,
+            stage_name_filter: StageNameFilters = None,
             auth_token: str = None,
             as_dict=False,
             **filters

@@ -1,9 +1,9 @@
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional
 
 from datastore_sdk.base_pad_site import BasePadSite
-from datastore_sdk.communicator import Communicator
-from datastore_sdk.constants import ENDPOINTS, StageNameFilter
+from datastore_sdk.constants import ENDPOINTS, StageNameFilters, DataResolutions, DataAggregations
+from datastore_sdk.data_object import Data
 from datastore_sdk.exceptions import APICompatibilityError
 
 
@@ -13,6 +13,7 @@ class Site(BasePadSite):
     _api_url_fields_metadata: str = ENDPOINTS.fields_for_site.value
     _api_url_stages_metadata: str = ENDPOINTS.stages_for_site.value
     _api_url_aggregations_metadata: str = ENDPOINTS.aggregations_for_site.value
+    _api_url_data: str = ENDPOINTS.data_for_site.value
 
     name: str
     date_created: datetime
@@ -87,3 +88,25 @@ class Site(BasePadSite):
         pad = await self.aget_pad()
         pad_measurement_sources = await pad.aget_measurement_sources_metadata()
         return self._extract_site_measurement_sources(pad_measurement_sources)
+
+    def get_data(
+            self,
+            start_datetime: datetime = None,
+            end_datetime: datetime = None,
+            stage_number: int = None,
+            stage_name_filter: StageNameFilters = None,
+            resolution: DataResolutions = DataResolutions.SECOND,
+            aggregation: DataAggregations = None,
+            si_units: bool = False,
+            measurement_sources_names: str | list[str] = None,
+    ) -> Data:
+        return super().get_data(
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            stage_number=stage_number,
+            stage_name_filter=stage_name_filter,
+            resolution=resolution,
+            aggregation=aggregation,
+            si_units=si_units,
+            measurement_sources_names=measurement_sources_names,
+        )

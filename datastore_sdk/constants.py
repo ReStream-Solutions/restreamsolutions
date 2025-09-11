@@ -15,8 +15,22 @@ class ENDPOINTS(Enum):
     stages_for_site = '/external/thirdparty/v1/sites/{id}/history/'
     aggregations_for_pad = '/external/thirdparty/v1/pads/{id}/aggregations/'
     aggregations_for_site = '/external/thirdparty/v1/sites/{id}/aggregations/'
+    data_for_pad = '/external/thirdparty/v1/pads/{id}/data/'
+    data_for_site = '/external/thirdparty/v1/sites/{id}/data/'
 
-class StageNameFilter(Enum):
+class StageNameFilters(Enum):
     FRAC = 'frac'
     WIRELINE = 'wl'
     STANDBY = 'standby'
+
+class DataResolutions(Enum):
+    SECOND = 'raw'
+    TEN_SECOND = 'ten-second'
+    MINUTE = 'minute'
+    TEN_MINUTE = 'ten-minute'
+    HOUR = 'hour'
+
+class DataAggregations(Enum):
+    MIN = 'min'
+    MAX = 'max'
+    MEAN = 'mean'

@@ -2,21 +2,24 @@ import warnings
 from datetime import datetime, timezone
 from typing import Any
 
-from datastore_sdk import StageNameFilter
+from datastore_sdk import StageNameFilters
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.communicator import Communicator
+from datastore_sdk.constants import DataResolutions, DataAggregations
+from datastore_sdk.data_object import Data
 
 
 class BasePadSite(BaseInterface):
     _api_url_fields_metadata: str = None
     _api_url_stages_metadata: str = None
     _api_url_aggregations_metadata: str = None
+    _api_url_data: str = None
 
     def _mix_stage_metadata_filters(self,
             start: datetime = None,
             end: datetime = None,
             stage_number: int = None,
-            stage_name_filter: StageNameFilter = None,
+            stage_name_filter: StageNameFilters = None,
             **filters) -> dict[str, int | str]:
 
         filters = filters.copy()
@@ -47,7 +50,7 @@ class BasePadSite(BaseInterface):
             start: datetime = None,
             end: datetime = None,
             stage_number: int = None,
-            stage_name_filter: StageNameFilter = None,
+            stage_name_filter: StageNameFilters = None,
             add_aggregations: bool = False,
             **filters) -> list[dict[str, Any]]:
         auth_token = self._select_token(self._auth_token)
@@ -65,7 +68,7 @@ class BasePadSite(BaseInterface):
             start: datetime = None,
             end: datetime = None,
             stage_number: int = None,
-            stage_name_filter: StageNameFilter = None,
+            stage_name_filter: StageNameFilters = None,
             add_aggregations: bool = False,
             **filters) -> list[dict[str, Any]]:
 
@@ -125,3 +128,61 @@ class BasePadSite(BaseInterface):
 
     async def aget_measurement_sources_metadata(self) -> dict:
         raise NotImplementedError()
+
+    def get_data(self, **filters: dict) -> Data:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_data, id=self.id)
+
+        start_datetime: datetime | None = filters.get('start_datetime')
+        end_datetime: datetime | None = filters.get('end_datetime')
+        fields: str | list[str] = filters.get('fields', 'exposed_to_customer')
+        si_units: bool = filters.get('si_units', False)
+        resolution: DataResolutions = filters.get('resolution', DataResolutions.SECOND)
+        stage_number: int | None = filters.get('stage_number')
+        stage_name_filter: StageNameFilters | None = filters.get('stage_name_filter')
+        aggregation: DataAggregations | None = filters.get('aggregation')
+        measurement_sources_names: str | list[str] | None = filters.get('measurement_sources_names')
+        is_routed: bool = filters.get('is_routed', False)
+
+        if start_datetime is not None and start_datetime.tzinfo is None:
+            raise ValueError("start_datetime must have a timezone")
+
+        if end_datetime is not None and end_datetime.tzinfo is None:
+            raise ValueError("end_datetime must have a timezone")
+
+        if stage_number is not None and stage_name_filter is None:
+            raise ValueError("Please provide stage_name_filter together with the stage_number.")
+
+        dt_format = '%Y-%m-%d %H:%M:%S'
+
+        params = {
+            'si_units': si_units,
+            'resolution': resolution.value,
+        }
+
+        if start_datetime is not None:
+            params['start_datetime'] = start_datetime.astimezone(timezone.utc).strftime(dt_format)
+
+        if end_datetime is not None:
+            params['end_datetime'] = end_datetime.astimezone(timezone.utc).strftime(dt_format)
+
+        if fields is not None:
+            params['fields'] = fields
+
+        if stage_number is not None:
+            params['stage_number'] = stage_number
+
+        if stage_name_filter is not None:
+            params['state_imatch'] = stage_name_filter.value
+
+        if aggregation is not None:
+            params['agg'] = aggregation
+
+        if measurement_sources_names is not None:
+            params['measurement_source'] = measurement_sources_names
+
+        if is_routed is not None:
+            params['routed'] = is_routed
+
+        data_generator = Communicator.steaming_get_generator(url, auth_token, **params)
+        return Data(data_generator)
