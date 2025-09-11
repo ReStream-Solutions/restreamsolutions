@@ -1,5 +1,5 @@
 import json
-from typing import Generator, AsyncGenerator
+from typing import Generator, AsyncGenerator, Callable
 from pathlib import Path
 
 import aiofiles
@@ -8,8 +8,12 @@ import aiofiles
 class Data:
     data_fetcher: Generator[dict, dict, None]
 
-    def __init__(self, data_generator: Generator[dict, dict, None]) -> None:
-        self.data_fetcher = data_generator
+    def __init__(self, data_generator_factory: Callable[[], Generator[dict, dict, None]]) -> None:
+        self._data_generator_factory = data_generator_factory
+
+    @property
+    def data_fetcher(self) -> Generator[dict, dict, None]:
+        return self._data_generator_factory()
 
     def save(self, path: str, overwrite: bool=False):
         path = Path(path)
@@ -35,8 +39,12 @@ class Data:
 class DataAsync:
     data_fetcher: AsyncGenerator[dict, None]
 
-    def __init__(self, data_generator: AsyncGenerator[dict, None]) -> None:
-        self.data_fetcher = data_generator
+    def __init__(self, data_generator_factory: Callable[[], AsyncGenerator[dict, None]]) -> None:
+        self._data_generator_factory = data_generator_factory
+
+    @property
+    def data_fetcher(self) -> AsyncGenerator[dict, None]:
+        return self._data_generator_factory()
 
     async def asave(self, path: str, overwrite: bool = False):
         path = Path(path)

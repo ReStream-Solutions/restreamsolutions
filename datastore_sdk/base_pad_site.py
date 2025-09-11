@@ -187,12 +187,12 @@ class BasePadSite(BaseInterface):
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data, id=self.id)
         params = self._build_get_data_params(**filters)
-        data_generator = Communicator.steaming_get_generator(url, auth_token, **params)
-        return Data(data_generator)
+        data_generator_factory = lambda: Communicator.steaming_get_generator(url, auth_token, **params)
+        return Data(data_generator_factory)
 
     async def aget_data(self, **filters: dict) -> DataAsync:
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data, id=self.id)
         params = self._build_get_data_params(**filters)
-        data_generator = Communicator.steaming_get_generator_async(url, auth_token, **params)
-        return DataAsync(data_generator)
+        data_generator_factory = lambda: Communicator.steaming_get_generator_async(url, auth_token, **params)
+        return DataAsync(data_generator_factory)
