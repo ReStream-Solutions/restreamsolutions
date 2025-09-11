@@ -10,3 +10,9 @@ class APICompatibilityError(Exception):
 
     def __init__(self, message: str = "API compatibility error: server response does not match expected schema or version"):
         super().__init__(message)
+
+class APIConcurrencyLimitError(Exception):
+    """Raised when the SDK's sends to many concurrent requests."""
+
+    def __init__(self, message: str = "Too many concurrent requests. Please try again later."):
+        super().__init__(message)

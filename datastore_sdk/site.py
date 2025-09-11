@@ -3,7 +3,7 @@ from typing import Optional
 
 from datastore_sdk.base_pad_site import BasePadSite
 from datastore_sdk.constants import ENDPOINTS, StageNameFilters, DataResolutions, DataAggregations
-from datastore_sdk.data_object import Data
+from datastore_sdk.data_object import Data, DataAsync
 from datastore_sdk.exceptions import APICompatibilityError
 
 
@@ -101,6 +101,28 @@ class Site(BasePadSite):
             measurement_sources_names: str | list[str] = None,
     ) -> Data:
         return super().get_data(
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            stage_number=stage_number,
+            stage_name_filter=stage_name_filter,
+            resolution=resolution,
+            aggregation=aggregation,
+            si_units=si_units,
+            measurement_sources_names=measurement_sources_names,
+        )
+
+    async def aget_data(
+            self,
+            start_datetime: datetime = None,
+            end_datetime: datetime = None,
+            stage_number: int = None,
+            stage_name_filter: StageNameFilters = None,
+            resolution: DataResolutions = DataResolutions.SECOND,
+            aggregation: DataAggregations = None,
+            si_units: bool = False,
+            measurement_sources_names: str | list[str] = None,
+    ) -> DataAsync:
+        return await super().aget_data(
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             stage_number=stage_number,

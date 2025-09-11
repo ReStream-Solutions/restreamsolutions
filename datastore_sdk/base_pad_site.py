@@ -6,7 +6,7 @@ from datastore_sdk import StageNameFilters
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.communicator import Communicator
 from datastore_sdk.constants import DataResolutions, DataAggregations
-from datastore_sdk.data_object import Data
+from datastore_sdk.data_object import Data, DataAsync
 
 
 class BasePadSite(BaseInterface):
@@ -129,10 +129,7 @@ class BasePadSite(BaseInterface):
     async def aget_measurement_sources_metadata(self) -> dict:
         raise NotImplementedError()
 
-    def get_data(self, **filters: dict) -> Data:
-        auth_token = self._select_token(self._auth_token)
-        url = self._format_url(self._api_url_data, id=self.id)
-
+    def _build_get_data_params(self, **filters: dict) -> dict:
         start_datetime: datetime | None = filters.get('start_datetime')
         end_datetime: datetime | None = filters.get('end_datetime')
         fields: str | list[str] = filters.get('fields', 'exposed_to_customer')
@@ -156,7 +153,7 @@ class BasePadSite(BaseInterface):
         dt_format = '%Y-%m-%d %H:%M:%S'
 
         params = {
-            'si_units': si_units,
+            'si_units': str(si_units).lower(),
             'resolution': resolution.value,
         }
 
@@ -182,7 +179,20 @@ class BasePadSite(BaseInterface):
             params['measurement_source'] = measurement_sources_names
 
         if is_routed is not None:
-            params['routed'] = is_routed
+            params['routed'] = str(is_routed).lower()
 
+        return params
+
+    def get_data(self, **filters: dict) -> Data:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_data, id=self.id)
+        params = self._build_get_data_params(**filters)
         data_generator = Communicator.steaming_get_generator(url, auth_token, **params)
         return Data(data_generator)
+
+    async def aget_data(self, **filters: dict) -> DataAsync:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_data, id=self.id)
+        params = self._build_get_data_params(**filters)
+        data_generator = Communicator.steaming_get_generator_async(url, auth_token, **params)
+        return DataAsync(data_generator)

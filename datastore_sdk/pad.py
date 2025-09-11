@@ -3,7 +3,7 @@ from datetime import datetime
 from datastore_sdk import StageNameFilters
 from datastore_sdk.base_pad_site import BasePadSite
 from datastore_sdk.constants import ENDPOINTS, DataResolutions, DataAggregations
-from datastore_sdk.data_object import Data
+from datastore_sdk.data_object import Data, DataAsync
 from datastore_sdk.exceptions import APICompatibilityError
 
 
@@ -76,12 +76,40 @@ class Pad(BasePadSite):
             si_units: bool = False,
             measurement_sources_names: str | list[str] = None,
             is_routed: bool = False,
-    ) -> Data:
+    ) ->Data:
 
         if not is_routed and stage_number is not None:
             raise ValueError('Please select is_routed = True to query data by stage_number.')
 
         return super().get_data(
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            stage_number=stage_number,
+            stage_name_filter=stage_name_filter,
+            resolution=resolution,
+            aggregation=aggregation,
+            si_units=si_units,
+            measurement_sources_names=measurement_sources_names,
+            is_routed=is_routed,
+        )
+
+    async def aget_data(
+            self,
+            start_datetime: datetime = None,
+            end_datetime: datetime = None,
+            stage_number: int = None,
+            stage_name_filter: StageNameFilters = None,
+            resolution: DataResolutions = DataResolutions.SECOND,
+            aggregation: DataAggregations = None,
+            si_units: bool = False,
+            measurement_sources_names: str | list[str] = None,
+            is_routed: bool = False,
+    ) -> DataAsync:
+
+        if not is_routed and stage_number is not None:
+            raise ValueError('Please select is_routed = True to query data by stage_number.')
+
+        return await super().aget_data(
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             stage_number=stage_number,

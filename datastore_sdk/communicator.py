@@ -7,7 +7,7 @@ import requests
 import httpx
 import ijson
 
-from .exceptions import AuthError, APICompatibilityError
+from .exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
 
 
 class Communicator:
@@ -29,6 +29,8 @@ class Communicator:
             raise AuthError()
         if status_code == 404:
             raise APICompatibilityError("The endpoint does not exist")
+        if status_code == 429:
+            raise APIConcurrencyLimitError()
         response.raise_for_status()
 
     @staticmethod
