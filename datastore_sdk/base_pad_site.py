@@ -6,6 +6,7 @@ from datastore_sdk import StageNameFilters
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.communicator import Communicator
 from datastore_sdk.constants import DataResolutions, DataAggregations
+from datastore_sdk.data_changes import DataChanges
 from datastore_sdk.data_object import Data, DataAsync
 
 
@@ -14,6 +15,8 @@ class BasePadSite(BaseInterface):
     _api_url_stages_metadata: str = None
     _api_url_aggregations_metadata: str = None
     _api_url_data: str = None
+    _api_url_data_changes_single: str = None
+    _api_url_data_changes_multiple: str = None
 
     def _mix_stage_metadata_filters(self,
             start: datetime = None,
@@ -139,7 +142,7 @@ class BasePadSite(BaseInterface):
         stage_name_filter: StageNameFilters | None = filters.get('stage_name_filter')
         aggregation: DataAggregations | None = filters.get('aggregation')
         measurement_sources_names: str | list[str] | None = filters.get('measurement_sources_names')
-        is_routed: bool = filters.get('is_routed', False)
+        is_routed: bool | None = filters.get('is_routed')
 
         if start_datetime is not None and start_datetime.tzinfo is None:
             raise ValueError("start_datetime must have a timezone")
@@ -196,3 +199,23 @@ class BasePadSite(BaseInterface):
         params = self._build_get_data_params(**filters)
         data_generator_factory = lambda: Communicator.steaming_get_generator_async(url, auth_token, **params)
         return DataAsync(data_generator_factory)
+
+    def get_data_changes(self, as_dict: bool = False, **filters: dict) -> DataChanges:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
+        data_changes = Communicator.send_get_request(url, auth_token, **filters)
+        return DataChanges._build_multiple_from_response(
+            json_response=data_changes.get('change_log', []),
+            auth_token=auth_token,
+            as_dict=as_dict,
+        )
+
+    async def aget_data_changes(self, as_dict: bool = False, **filters: dict) -> DataChanges:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
+        data_changes = await Communicator.send_get_request_async(url, auth_token, **filters)
+        return DataChanges._build_multiple_from_response(
+            json_response=data_changes.get('change_log', []),
+            auth_token=auth_token,
+            as_dict=as_dict,
+        )

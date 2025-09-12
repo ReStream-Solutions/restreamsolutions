@@ -8,12 +8,14 @@ from datastore_sdk.exceptions import APICompatibilityError
 
 
 class Pad(BasePadSite):
-    _api_url_single_object: str = ENDPOINTS.pads_get_one.value
-    _api_url_multiple_objects: str = ENDPOINTS.pads_get_many.value
-    _api_url_fields_metadata: str = ENDPOINTS.fields_for_pad.value
-    _api_url_stages_metadata: str = ENDPOINTS.stages_for_pad.value
-    _api_url_aggregations_metadata: str = ENDPOINTS.aggregations_for_pad.value
-    _api_url_data: str = ENDPOINTS.data_for_pad.value
+    _api_url_single_object: str = ENDPOINTS.pads_one.value
+    _api_url_multiple_objects: str = ENDPOINTS.pads_many.value
+    _api_url_fields_metadata: str = ENDPOINTS.fields_pad.value
+    _api_url_stages_metadata: str = ENDPOINTS.stages_pad.value
+    _api_url_aggregations_metadata: str = ENDPOINTS.aggregations_pad.value
+    _api_url_data: str = ENDPOINTS.data_pad.value
+    _api_url_data_changes_single: str = ENDPOINTS.data_changes_pad_one.value
+    _api_url_data_changes_multiple: str = ENDPOINTS.data_changes_pad_many.value
 
     id: str
     name: str

@@ -91,13 +91,13 @@ class BaseInterface:
         return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_dict=as_dict)
 
     def update(self):
-        updated_json = self.get_model(id=self.id, as_dict=True)
-        for key, value in updated_json.items():
+        updated_dict = self.get_model(id=self.id, as_dict=True)
+        for key, value in updated_dict.items():
             setattr(self, key, self._try_convert_value(key, value))
 
     async def aupdate(self):
-        updated_json = await self.aget_model(id=self.id, as_dict=True)
-        for key, value in updated_json.items():
+        updated_dict = await self.aget_model(id=self.id, as_dict=True)
+        for key, value in updated_dict.items():
             setattr(self, key, self._try_convert_value(key, value))
 
     def __repr__(self):

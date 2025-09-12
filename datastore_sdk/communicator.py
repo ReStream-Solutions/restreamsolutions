@@ -63,10 +63,24 @@ class Communicator:
         return response.json()
 
     @staticmethod
+    def send_post_request(url: str, auth_token: str, payload: dict,  **params) -> dict | list:
+        headers = Communicator._create_headers(auth_token)
+        response = requests.post(url, params=params, headers=headers, json=payload)
+        Communicator._check_response_status_code(response)
+        return response.json()
+
+    @staticmethod
+    async def send_post_request_async(url: str, auth_token: str, payload: dict, **params) -> dict | list:
+        headers = Communicator._create_headers(auth_token)
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(url, params=params, headers=headers, json=payload)
+        Communicator._check_response_status_code(response)
+        return response.json()
+
+    @staticmethod
     def steaming_get_generator(url: str, auth_token: str, **params) -> Generator[dict, dict, None]:
         headers = Communicator._create_headers(auth_token)
         with requests.get(url, params=params, headers=headers, stream=True, timeout=(5, None)) as stream:
-            print(stream.url)
             Communicator._check_response_status_code(stream)
             stream.raw.decode_content = True
             for obj in ijson.items(stream.raw, 'item'):

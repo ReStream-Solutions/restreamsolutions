@@ -6,8 +6,8 @@ from datastore_sdk.constants import ENDPOINTS
 
 
 class State(BaseInterface):
-    _api_url_single_object: str = ENDPOINTS.states_get_one.value
-    _api_url_multiple_objects: str = ENDPOINTS.states_get_many.value
+    _api_url_single_object: str = ENDPOINTS.states_one.value
+    _api_url_multiple_objects: str = ENDPOINTS.states_many.value
 
     site: dict
     site_component_configuration: dict
