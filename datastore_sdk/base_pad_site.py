@@ -200,22 +200,32 @@ class BasePadSite(BaseInterface):
         data_generator_factory = lambda: Communicator.steaming_get_generator_async(url, auth_token, **params)
         return DataAsync(data_generator_factory)
 
-    def get_data_changes(self, as_dict: bool = False, **filters: dict) -> DataChanges:
+    def get_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[dict | DataChanges, Data]:
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
-        data_changes = Communicator.send_get_request(url, auth_token, **filters)
-        return DataChanges._build_multiple_from_response(
-            json_response=data_changes.get('change_log', []),
+        response = Communicator.send_get_request(url, auth_token, **filters)
+        raw_changes: list[dict[str, Any]] = response.get('change_log', [])
+
+        changes_list = DataChanges._build_multiple_from_response(
+            json_response=raw_changes,
             auth_token=auth_token,
             as_dict=as_dict,
         )
 
-    async def aget_data_changes(self, as_dict: bool = False, **filters: dict) -> DataChanges:
+        combined_data = DataChanges._build_combined_data_object(raw_changes, auth_token)
+        return changes_list, combined_data
+
+    async def aget_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[list[dict | DataChanges], DataAsync]:
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
-        data_changes = await Communicator.send_get_request_async(url, auth_token, **filters)
-        return DataChanges._build_multiple_from_response(
-            json_response=data_changes.get('change_log', []),
+        response = await Communicator.send_get_request_async(url, auth_token, **filters)
+        raw_changes: list[dict[str, Any]] = response.get('change_log', [])
+
+        changes_list = DataChanges._build_multiple_from_response(
+            json_response=raw_changes,
             auth_token=auth_token,
             as_dict=as_dict,
         )
+
+        combined_data_async = DataChanges._build_combined_data_async_object(raw_changes, auth_token)
+        return changes_list, combined_data_async
