@@ -1,5 +1,4 @@
 from decimal import Decimal
-from math import inf
 from typing import Generator, Any, AsyncGenerator
 
 import aiohttp
@@ -40,7 +39,7 @@ class Communicator:
             if isinstance(value, Decimal):
                 return float(value)
             elif value == 'Infinity':
-                return inf
+                return None
             else:
                 return value
 
