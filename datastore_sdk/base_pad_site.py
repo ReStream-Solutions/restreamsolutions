@@ -11,6 +11,22 @@ from datastore_sdk.data_object import Data, DataAsync
 
 
 class BasePadSite(BaseInterface):
+    """Base class for Pad and Site model objects that exposes metadata and data access methods.
+
+    This class provides common functionality for interacting with Restream customer endpoints related to
+    fields metadata, stages (histories) metadata (with optional aggregations), measurement sources, raw/streaming
+    data retrieval, data changes, etc. Both synchronous and asynchronous methods are provided
+    where applicable. Concrete subclasses are expected to define API URL templates via the
+    class attributes below and may override abstract/NotImplemented methods.
+
+    Expected class attributes (URL templates with placeholders):
+    - _api_url_fields_metadata
+    - _api_url_stages_metadata
+    - _api_url_aggregations_metadata
+    - _api_url_data
+    - _api_url_data_changes_single
+    - _api_url_data_changes_multiple
+    """
     _api_url_fields_metadata: str = None
     _api_url_stages_metadata: str = None
     _api_url_aggregations_metadata: str = None
@@ -24,7 +40,18 @@ class BasePadSite(BaseInterface):
             stage_number: int = None,
             stage_name_filter: StageNameFilters = None,
             **filters) -> dict[str, int | str]:
+        """Compose query params for stages metadata endpoints.
 
+        Parameters:
+            start: Optional start datetime (tz aware); will be converted to UTC and formatted as ISO string.
+            end: Optional end datetime (tz aware); will be converted to UTC and formatted as ISO string.
+            stage_number: Optional stage number to filter by.
+            stage_name_filter: Optional StageNameFilters enum to filter by stage name (frac, wireline, etc.).
+            **filters: Additional filters to be merged.
+
+        Returns:
+            A new dict containing the merged and normalized filters.
+        """
         filters = filters.copy()
         if start:
             start_utc = start.astimezone(timezone.utc)
@@ -39,11 +66,28 @@ class BasePadSite(BaseInterface):
         return filters
 
     def get_fields_metadata(self, **filters) -> list[dict[str, Any]]:
+        """Fetch all available data fields and their metadata related to the current entity (pad/site).
+
+        Parameters:
+            **filters: Optional query parameters supported by the endpoint.
+
+        Returns:
+            A list of metadata dictionaries for available fields.
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_fields_metadata, id=self.id)
         return Communicator.send_get_request(url, auth_token, **filters)
 
     async def aget_fields_metadata(self, **filters) -> list[dict[str, Any]]:
+        """Asynchronously fetch all available data fields names and their metadata related
+        to the current entity (Pad or Site).
+
+        Parameters:
+            **filters: Optional query parameters supported by the endpoint.
+
+        Returns:
+            A list of metadata dictionaries for available fields.
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_fields_metadata, id=self.id)
         return await Communicator.send_get_request_async(url, auth_token, **filters)
@@ -56,6 +100,20 @@ class BasePadSite(BaseInterface):
             stage_name_filter: StageNameFilters = None,
             add_aggregations: bool = False,
             **filters) -> list[dict[str, Any]]:
+        """Fetch historic stages metadata for this entity (pad/site). Optionally adds aggregated metrics to the metadata.
+
+        Parameters:
+            start: Optional start datetime (timezone-aware) to filter stages.
+            end: Optional end datetime (timezone-aware) to filter stages.
+            stage_number: Optional stage number to filter by also requires stage_name_filter, if provided.
+            stage_name_filter: Optional StageNameFilters enum value to filter stage name.
+            add_aggregations: If True, enrich each stage with its data aggregations.
+            **filters: Additional endpoint filters, supported by the endpoint.
+
+        Returns:
+            A list of dictionaries describing stages. If add_aggregations=True, each item may
+            include an "aggregations" key with aggregation details (or None if unavailable).
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_stages_metadata, id=self.id)
         filters = self._mix_stage_metadata_filters(start, end, stage_number, stage_name_filter, **filters)
@@ -74,7 +132,21 @@ class BasePadSite(BaseInterface):
             stage_name_filter: StageNameFilters = None,
             add_aggregations: bool = False,
             **filters) -> list[dict[str, Any]]:
+        """Asynchronously fetch historic stages metadata for this entity (pad/site).
+        Optionally adds aggregated metrics to the metadata.
 
+        Parameters:
+            start: Optional start datetime (timezone-aware) to filter stages.
+            end: Optional end datetime (timezone-aware) to filter stages.
+            stage_number: Optional stage number to filter by also requires stage_name_filter, if provided.
+            stage_name_filter: Optional StageNameFilters enum value to filter stage name.
+            add_aggregations: If True, enrich each stage with its data aggregations.
+            **filters: Additional endpoint filters, supported by the endpoint.
+
+        Returns:
+            A list of dictionaries describing stages. If add_aggregations=True, each item may
+            include an "aggregations" key with aggregation details (or None if unavailable).
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_stages_metadata, id=self.id)
         filters = self._mix_stage_metadata_filters(start, end, stage_number, stage_name_filter, **filters)
@@ -89,7 +161,17 @@ class BasePadSite(BaseInterface):
     def _merge_aggregations_with_stages(
             stages_metadata: list[dict[str, Any]],
             aggregations_metadata: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+        """Attach aggregation metadata to corresponding stage items by its id.
 
+        Parameters:
+            stages_metadata: List of stage metadata dicts, each should contain an 'id'.
+            aggregations_metadata: Mapping from site id to a list of aggregation dicts; if a value
+                is a string, it's treated as an error message for that site and is skipped.
+
+        Returns:
+            The input stages_metadata list with an added 'aggregations' key for each item
+            (either a dict with aggregation fields or None if not available).
+        """
         aggregations_by_stage_id = {}
         for site_id, aggregations in aggregations_metadata.items():
             if isinstance(aggregations, str):
@@ -108,6 +190,15 @@ class BasePadSite(BaseInterface):
         return stages_metadata
 
     def _add_aggregations(self, stages_metadata: list[dict[str, Any]], auth_token: str) -> list[dict[str, Any]]:
+        """Fetch and attach aggregations to the provided historic stages list.
+
+        Parameters:
+            stages_metadata: List of historic stage dicts obtained from get_stages_metadata.
+            auth_token: Authorization token.
+
+        Returns:
+            The same list enriched with an 'aggregations' key for each stage.
+        """
         if not stages_metadata:
             return stages_metadata
         stages_ids = [stage.get('id') for stage in stages_metadata if stage.get('id') is not None]
@@ -117,6 +208,15 @@ class BasePadSite(BaseInterface):
         return stages_metadata
 
     async def _add_aggregations_async(self, stages_metadata: list[dict[str, Any]], auth_token: str) -> list[dict[str, Any]]:
+        """Asynchronously fetch and attach aggregations to the provided historic stages list.
+
+        Parameters:
+            stages_metadata: List of historic stage dicts obtained from get_stages_metadata.
+            auth_token: Authorization token.
+
+        Returns:
+            The same list enriched with an 'aggregations' key for each stage.
+        """
         if not stages_metadata:
             return stages_metadata
         stages_ids = [stage.get('id') for stage in stages_metadata if stage.get('id') is not None]
@@ -127,12 +227,44 @@ class BasePadSite(BaseInterface):
 
 
     def get_measurement_sources_metadata(self) -> dict:
+        """Fetch metadata about measurement sources for this entity.
+
+        Note:
+            This is expected to be implemented by subclasses with the proper endpoint.
+        """
         raise NotImplementedError()
 
     async def aget_measurement_sources_metadata(self) -> dict:
+        """Asynchronously fetch metadata about measurement sources for this entity.
+
+        Note:
+            This is expected to be implemented by subclasses with the proper endpoint.
+        """
         raise NotImplementedError()
 
     def _build_get_data_params(self, **filters: dict) -> dict:
+        """Normalize and prepare query parameters for data retrieval endpoints.
+
+        Supported filter keys in **filters:
+            - start_datetime (datetime | None): timezone-aware; converted to UTC with '%Y-%m-%d %H:%M:%S'.
+            - end_datetime (datetime | None): timezone-aware; converted to UTC with '%Y-%m-%d %H:%M:%S'.
+            - fields (str | list[str]): which fields to return; defaults to 'exposed_to_customer'.
+            - si_units (bool): return values in SI units if True; default False.
+            - resolution (DataResolutions): time resolution; defaults to SECOND.
+            - stage_number (int | None): stage number; requires stage_name_filter alongside.
+            - stage_name_filter (StageNameFilters | None): stage state name filter.
+            - aggregation (DataAggregations | None): optional aggregation to apply.
+            - measurement_sources_names (str | list[str] | None): names to filter by measurement source.
+            - is_routed (bool | None): For pads entities only. If true - returns the data separately for each site,
+            otherwise each item will contain data for the entire pad for a given timestamp.
+
+        Returns:
+            A dict of parameters ready to be passed into the Communicator requests.
+
+        Raises:
+            ValueError: if provided datetimes are not timezone-aware, or if stage_number is
+            provided without stage_name_filter.
+        """
         start_datetime: datetime | None = filters.get('start_datetime')
         end_datetime: datetime | None = filters.get('end_datetime')
         fields: str | list[str] = filters.get('fields', 'exposed_to_customer')
@@ -187,6 +319,14 @@ class BasePadSite(BaseInterface):
         return params
 
     def get_data(self, **filters: dict) -> Data:
+        """Return a Data object that streams data records for this entity.
+
+        Parameters:
+            **filters: See _build_get_data_params for the complete list of supported filters.
+
+        Returns:
+            A Data object that lazily iterates over streamed records from the API.
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data, id=self.id)
         params = self._build_get_data_params(**filters)
@@ -194,13 +334,33 @@ class BasePadSite(BaseInterface):
         return Data(data_generator_factory)
 
     async def aget_data(self, **filters: dict) -> DataAsync:
+        """Return a DataAsync object that streams data records asynchronously.
+
+        Parameters:
+            **filters: See _build_get_data_params for the complete list of supported filters.
+
+        Returns:
+            A DataAsync object that lazily iterates over streamed records from the API.
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data, id=self.id)
         params = self._build_get_data_params(**filters)
         data_generator_factory = lambda: Communicator.steaming_get_generator_async(url, auth_token, **params)
         return DataAsync(data_generator_factory)
 
-    def get_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[dict | DataChanges, Data]:
+    def get_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[list[dict | DataChanges], Data]:
+        """Fetch all data change events for the current object (Site or Pad) and a Data object
+        that allows to stream the affected data or save it to a file.
+        
+        Parameters:
+            as_dict: If True, each change is returned as a dict; otherwise as DataChanges objects.
+            **filters: Optional filters accepted by the change log endpoint.
+        
+        Returns:
+            A tuple of (changes_list, combined_data) where:
+              - changes_list is a list of dicts or DataChanges instances depending on as_dict.
+              - combined_data is a Data object representing a concatenation of change intervals.
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
         response = Communicator.send_get_request(url, auth_token, **filters)
@@ -216,6 +376,18 @@ class BasePadSite(BaseInterface):
         return changes_list, combined_data
 
     async def aget_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[list[dict | DataChanges], DataAsync]:
+        """Asynchronously fetch all data change events for the current object (Site or Pad), along with
+        a DataAsync object that allows you to stream the affected data or save it to a file.
+        
+        Parameters:
+            as_dict: If True, each change is returned as a dict; otherwise as DataChanges objects.
+            **filters: Optional filters accepted by the change log endpoint.
+        
+        Returns:
+            A tuple of (changes_list, combined_data) where:
+              - changes_list is a list of dicts or DataChanges instances depending on as_dict.
+              - combined_data is a DataAsync object representing a concatenation of change intervals.
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
         response = await Communicator.send_get_request_async(url, auth_token, **filters)
