@@ -1,8 +1,20 @@
+"""Constants and enumerations used across the datastore SDK."""
+
 from enum import Enum
 
+# Base URL for the Restream Solutions external API
 RESTREAM_HOST = 'https://app.restreamsolutions.com'
 
 class ENDPOINTS(Enum):
+    """REST API endpoint path templates.
+
+    Notes:
+        Many endpoints include placeholders that must be formatted:
+        - {id}: Identifier of the target resource (site, pad, or state).
+        - {parent_id}: Identifier of the parent resource (site or pad) when
+          working with nested resources like data changes.
+    """
+
     sites_one = '/external/thirdparty/v1/sites/{id}/'
     sites_many = '/external/thirdparty/v1/sites/'
     pads_one = '/external/thirdparty/v1/pads/{id}/'
@@ -23,11 +35,15 @@ class ENDPOINTS(Enum):
     data_changes_pad_one = '/external/thirdparty/v1/pads/{parent_id}/data_changes/{id}/'
 
 class StageNameFilters(Enum):
-    FRAC = 'frac'
-    WIRELINE = 'wl'
-    STANDBY = 'standby'
+    """Short codes used to filter stage history by operation type."""
+
+    FRAC = 'frac'       # Frac operations
+    WIRELINE = 'wl'     # Wireline operations
+    STANDBY = 'standby' # Non-operational/standby periods
 
 class DataResolutions(Enum):
+    """Allowed sampling resolutions for time-series data requests."""
+
     SECOND = 'raw'
     TEN_SECOND = 'ten-second'
     MINUTE = 'minute'
@@ -35,6 +51,8 @@ class DataResolutions(Enum):
     HOUR = 'hour'
 
 class DataAggregations(Enum):
+    """Aggregation functions supported by the API when querying time-series data."""
+
     MIN = 'min'
     MAX = 'max'
     MEAN = 'mean'
