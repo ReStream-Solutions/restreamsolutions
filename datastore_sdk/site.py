@@ -99,6 +99,7 @@ class Site(BasePadSite):
             stage_name_filter: StageNameFilters = None,
             resolution: DataResolutions = DataResolutions.SECOND,
             aggregation: DataAggregations = None,
+            fields: str | list[str] = None,
             si_units: bool = False,
             measurement_sources_names: str | list[str] = None,
     ) -> Data:
@@ -109,6 +110,7 @@ class Site(BasePadSite):
             stage_name_filter=stage_name_filter,
             resolution=resolution,
             aggregation=aggregation,
+            fields=fields,
             si_units=si_units,
             measurement_sources_names=measurement_sources_names,
         )
@@ -121,6 +123,7 @@ class Site(BasePadSite):
             stage_name_filter: StageNameFilters = None,
             resolution: DataResolutions = DataResolutions.SECOND,
             aggregation: DataAggregations = None,
+            fields: str | list[str] = None,
             si_units: bool = False,
             measurement_sources_names: str | list[str] = None,
     ) -> DataAsync:
@@ -131,6 +134,7 @@ class Site(BasePadSite):
             stage_name_filter=stage_name_filter,
             resolution=resolution,
             aggregation=aggregation,
+            fields=fields,
             si_units=si_units,
             measurement_sources_names=measurement_sources_names,
         )

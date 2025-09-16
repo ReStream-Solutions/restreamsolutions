@@ -200,6 +200,7 @@ class Pad(BasePadSite):
             stage_name_filter: StageNameFilters = None,
             resolution: DataResolutions = DataResolutions.SECOND,
             aggregation: DataAggregations = None,
+            fields: str | list[str] = None,
             si_units: bool = False,
             measurement_sources_names: str | list[str] = None,
             is_routed: bool = False,
@@ -218,6 +219,8 @@ class Pad(BasePadSite):
             aggregation (DataAggregations | None): Optional aggregation to apply.
             si_units (bool): If True, values are converted to SI units.
             measurement_sources_names (str | list[str] | None): Filter by measurement source names.
+            fields: (str | list[str] | None): Optional fields filter.
+                Use get_fields_metadata() method to get all available fields for this pad.
             is_routed (bool): Required when stage_number is set. If True, return data routed per site; otherwise each
                 element represents data for the entire pad at a given timestamp. If is_routed=False and simops is
                 configured for this pad, the simulator-run fields will be prefixed according to configured measurement
@@ -249,6 +252,7 @@ class Pad(BasePadSite):
             stage_name_filter=stage_name_filter,
             resolution=resolution,
             aggregation=aggregation,
+            fields=fields,
             si_units=si_units,
             measurement_sources_names=measurement_sources_names,
             is_routed=is_routed,
@@ -262,6 +266,7 @@ class Pad(BasePadSite):
             stage_name_filter: StageNameFilters = None,
             resolution: DataResolutions = DataResolutions.SECOND,
             aggregation: DataAggregations = None,
+            fields: str | list[str] = None,
             si_units: bool = False,
             measurement_sources_names: str | list[str] = None,
             is_routed: bool = False,
@@ -278,6 +283,8 @@ class Pad(BasePadSite):
             stage_name_filter (StageNameFilters | None): Filter for stage names (frac, wireline, etc.).
             resolution (DataResolutions): Sampling resolution of the output series (seconds, minutes, hours, etc.).
             aggregation (DataAggregations | None): Optional aggregation to apply.
+            fields: (str | list[str] | None): Optional fields filter.
+                Use get_fields_metadata() method to get all available fields for this pad.
             si_units (bool): If True, values are converted to SI units.
             measurement_sources_names (str | list[str] | None): Filter by measurement source names.
             is_routed (bool): Required when stage_number is set. If True, return data routed per site; otherwise
@@ -311,6 +318,7 @@ class Pad(BasePadSite):
             stage_name_filter=stage_name_filter,
             resolution=resolution,
             aggregation=aggregation,
+            fields=fields,
             si_units=si_units,
             measurement_sources_names=measurement_sources_names,
             is_routed=is_routed,
