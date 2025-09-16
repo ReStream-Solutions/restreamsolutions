@@ -28,6 +28,8 @@ class DataChanges(BaseInterface):
     _api_url_single_object: str = ENDPOINTS.data_changes_site_one.value
     _api_url_multiple_objects: str = ENDPOINTS.data_changes_site_many.value
 
+    # These type hints are used by the BaseInterface class to perform automatic type conversion
+    # when a new instance is created.
     created_at: datetime
     modification_type: str
     modification_subtype: str
