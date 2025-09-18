@@ -344,6 +344,10 @@ The `get_data_changes()` method (and its async version `aget_data_changes()`) is
 It returns a tuple containing a list of `DataChange` objects and a single `Data` or `DataAsync` object for fetching 
 the corresponding data.
 
+After receiving and processing the changes, you need to confirm their retrieval. This ensures that the next time you 
+check for data changes, the ones already processed will be excluded. To do this, call `confirm_data_received()`
+(or `aconfirm_data_received()` for the async version) on the `DataChange` objects you have handled.
+
 ```python
 from datastore_sdk import Pad
 pad = Pad(id=668)
@@ -362,6 +366,10 @@ for one_second_item in changed_data.data_fetcher:
 
 # Save the changed data to a file
 changed_data.save('./data/data_changes.json', overwrite=True)
+
+# Confirm that all data change events have been received and processed
+for event in change_events:
+    event.confirm_data_received()
 ```
 
 You can also fetch the data for a single, specific change event.
@@ -377,6 +385,9 @@ if change_events:
 
     for one_second_item in first_event_data.data_fetcher:
         print(one_second_item)
+
+    # Confirm that you have received and processed the change event
+    first_change_event.confirm_data_received()
 ```
 
 ## License
