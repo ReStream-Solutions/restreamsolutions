@@ -5,7 +5,7 @@ from typing import Any
 from datastore_sdk import StageNameFilters
 from datastore_sdk.base_interface import BaseInterface
 from datastore_sdk.communicator import Communicator
-from datastore_sdk.constants import DataResolutions, DataAggregations
+from datastore_sdk.constants import DataResolutions, DataAggregations, DataFillMethods
 from datastore_sdk.data_changes import DataChanges
 from datastore_sdk.data_object import Data, DataAsync
 
@@ -275,6 +275,9 @@ class BasePadSite(BaseInterface):
         aggregation: DataAggregations | None = filters.get('aggregation')
         measurement_sources_names: str | list[str] | None = filters.get('measurement_sources_names')
         is_routed: bool | None = filters.get('is_routed')
+        fill_data_method: DataFillMethods | None = filters.get('fill_data_method')
+        fill_data_limit: int | None = filters.get('fill_data_limit')
+        inside_area_only: bool = filters.get('inside_area_only', True)
 
         if start_datetime is not None and start_datetime.tzinfo is None:
             raise ValueError("start_datetime must have a timezone")
@@ -284,6 +287,21 @@ class BasePadSite(BaseInterface):
 
         if stage_number is not None and stage_name_filter is None:
             raise ValueError("Please provide stage_name_filter together with the stage_number.")
+
+        # Validate fill_data_method and fill_data_limit
+        if fill_data_method is not None:
+            if not isinstance(fill_data_method, DataFillMethods):
+                raise ValueError('fill_data_method must be of type DataFillMethods')
+            if fill_data_limit is None:
+                raise ValueError('Please provide "fill_data_limit" together with "fill_data_method".')
+            if resolution != DataResolutions.SECOND:
+                raise ValueError('fill_data_method option can only be used with DataResolutions.SECOND resolution.')
+            if aggregation is not None:
+                raise ValueError('fill_data_method option cannot be used together with aggregation.')
+        # Validate limit if provided (even without method, it just has no effect)
+        if fill_data_limit is not None:
+            if not isinstance(fill_data_limit, int) or fill_data_limit <= 0:
+                raise ValueError('"fill_data_limit" must be a positive integer.')
 
         dt_format = '%Y-%m-%d %H:%M:%S'
 
@@ -308,13 +326,18 @@ class BasePadSite(BaseInterface):
             params['state_imatch'] = stage_name_filter.value
 
         if aggregation is not None:
-            params['agg'] = aggregation
+            params['agg'] = aggregation.value
 
         if measurement_sources_names is not None:
             params['measurement_source'] = measurement_sources_names
 
         if is_routed is not None:
             params['routed'] = str(is_routed).lower()
+
+        if fill_data_method is not None and fill_data_limit is not None:
+            params['fill_data_method'] = fill_data_method.value
+            params['fill_data_limit'] = str(fill_data_limit)
+            params['inside_area_only'] = str(inside_area_only).lower()
 
         return params
 

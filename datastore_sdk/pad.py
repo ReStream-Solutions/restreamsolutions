@@ -3,7 +3,7 @@ from typing import Any
 
 from datastore_sdk import StageNameFilters
 from datastore_sdk.base_pad_site import BasePadSite
-from datastore_sdk.constants import ENDPOINTS, DataResolutions, DataAggregations
+from datastore_sdk.constants import ENDPOINTS, DataResolutions, DataAggregations, DataFillMethods
 from datastore_sdk.data_object import Data, DataAsync
 from datastore_sdk.exceptions import APICompatibilityError
 
@@ -204,6 +204,9 @@ class Pad(BasePadSite):
             si_units: bool = False,
             measurement_sources_names: str | list[str] = None,
             is_routed: bool = False,
+            fill_data_method: DataFillMethods = None,
+            fill_data_limit: int | None = None,
+            inside_area_only: bool = True,
     ) -> Data:
         """Stream time-series data for this pad or save it to a file.
 
@@ -227,6 +230,16 @@ class Pad(BasePadSite):
                 sources, e.g., M1_slurry_flow for measurement source M1 and M2_slurry_flow for M2, instead of just
                 slurry_flow. Use get_fields_metadata() to get the full list of available fields and
                 get_measurement_sources_metadata() to map measurement sources to sites.
+            fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
+                to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
+                to fill missing values backward before the next known value. If provided, resolution must be
+                DataResolutions.SECOND and aggregation must be None.
+            fill_data_limit (int | None): Required when fill_data_method is provided. Maximum number of seconds to fill
+                per gap: for FORWARD_FILL this applies after a known value; for BACKWARD_FILL this applies before a
+                known value. Has no effect if fill_data_method is not provided. Must be a positive integer.
+            inside_area_only (bool): Optional. Default True. Controls whether filling is restricted to internal gaps
+                between original values (True) or may extend across edges (False). Has effect only when
+                fill_data_method is provided.
 
         Returns:
             Data: A Data object that lazily streams records from the API when iterated over.
@@ -256,6 +269,9 @@ class Pad(BasePadSite):
             si_units=si_units,
             measurement_sources_names=measurement_sources_names,
             is_routed=is_routed,
+            fill_data_method=fill_data_method,
+            fill_data_limit=fill_data_limit,
+            inside_area_only=inside_area_only,
         )
 
     async def aget_data(
@@ -270,6 +286,9 @@ class Pad(BasePadSite):
             si_units: bool = False,
             measurement_sources_names: str | list[str] = None,
             is_routed: bool = False,
+            fill_data_method: DataFillMethods = None,
+            fill_data_limit: int | None = None,
+            inside_area_only: bool = True,
     ) -> DataAsync:
         """Asynchronously stream time-series data for this pad or save it to a file.
 
@@ -293,6 +312,16 @@ class Pad(BasePadSite):
                 sources, e.g., M1_slurry_flow for measurement source M1 and M2_slurry_flow for M2, instead of just
                 slurry_flow. Use aget_fields_metadata() to get the full list of available fields and
                 aget_measurement_sources_metadata() to map measurement sources to sites.
+            fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
+                to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
+                to fill missing values backward before the next known value. If provided, resolution must be
+                DataResolutions.SECOND and aggregation must be None.
+            fill_data_limit (int | None): Required when fill_data_method is provided. Maximum number of seconds to fill
+                per gap: for FORWARD_FILL this applies after a known value; for BACKWARD_FILL this applies before a
+                known value. Has no effect if fill_data_method is not provided. Must be a positive integer.
+            inside_area_only (bool): Optional. Default True. Controls whether filling is restricted to internal gaps
+                between original values (True) or may extend across edges (False). Has effect only when
+                fill_data_method is provided.
 
         Returns:
             DataAsync: A DataAsync object that lazily streams records from the API when asynchronously iterated over.
@@ -322,4 +351,7 @@ class Pad(BasePadSite):
             si_units=si_units,
             measurement_sources_names=measurement_sources_names,
             is_routed=is_routed,
+            fill_data_method=fill_data_method,
+            fill_data_limit=fill_data_limit,
+            inside_area_only=inside_area_only,
         )

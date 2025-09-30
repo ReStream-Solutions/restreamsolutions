@@ -56,3 +56,7 @@ class DataAggregations(Enum):
     MIN = 'min'
     MAX = 'max'
     MEAN = 'mean'
+
+class DataFillMethods(Enum):
+    BACKWARD_FILL = 'bfill'
+    FORWARD_FILL = 'ffill'
