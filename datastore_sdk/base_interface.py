@@ -210,7 +210,7 @@ class BaseInterface:
         Returns:
             None. The instance is updated in-place.
         """
-        updated_dict = self.get_model(id=self.id, as_dict=True)
+        updated_dict = self.get_model(id=self.id, as_dict=True, auth_token=self._auth_token)
         for key, value in updated_dict.items():
             setattr(self, key, self._try_convert_value(key, value))
 
@@ -220,7 +220,7 @@ class BaseInterface:
         Returns:
             None. The instance is updated in-place.
         """
-        updated_dict = await self.aget_model(id=self.id, as_dict=True)
+        updated_dict = await self.aget_model(id=self.id, as_dict=True, auth_token=self._auth_token)
         for key, value in updated_dict.items():
             setattr(self, key, self._try_convert_value(key, value))
 

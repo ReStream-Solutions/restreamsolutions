@@ -26,8 +26,6 @@ class Site(BasePadSite):
       - longitude (int): Longitude in microdegrees.
       - lease_name (str): Lease name associated with the site.
       - operator_name (str): Operator name.
-      - crew (str): Crew name.
-      - division (str): Division name.
       - metadata (dict): Additional metadata dictionary.
       - well_api (str): Well API number if available.
       - pad_id (int): Identifier of the parent Pad.
@@ -52,8 +50,6 @@ class Site(BasePadSite):
     longitude: int
     lease_name: str
     operator_name: str
-    crew: str
-    division: str
     metadata: dict
     well_api: str
     pad_id: int

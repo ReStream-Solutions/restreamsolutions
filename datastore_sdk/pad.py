@@ -39,7 +39,6 @@ class Pad(BasePadSite):
 
     # These type hints are used by the BaseInterface class to perform automatic type conversion
     # when a new instance is created.
-    id: str
     name: str
     lease_name: str
     customer_name: str
