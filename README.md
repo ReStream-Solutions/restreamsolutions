@@ -390,6 +390,14 @@ if change_events:
     first_change_event.confirm_data_received()
 ```
 
+## Running tests
+
+Run from the repository root folder
+
+```shell
+pytest
+```
+
 ## License
 
 This project is distributed under the MIT License. See the `LICENSE` file.
