@@ -1,0 +1,271 @@
+[
+  {
+    "id": 203,
+    "site": {
+      "id": 1112,
+      "slug": "Jessica_3WB",
+      "well_api": "4222742176",
+      "name": "Jessica 3WB",
+      "short_name": "J3WB",
+      "fleet": {
+        "id": 36,
+        "name": "Atreides"
+      },
+      "crew": null,
+      "stage_total": 79,
+      "date_created": "2024-03-07T10:28:28Z",
+      "pad": {
+        "id": 697,
+        "name": "Arrakis",
+        "customer": {
+          "id": 2,
+          "name": "ReStream Solutions"
+        },
+        "simops_config": {
+          "frac": "run",
+          "wireline": null,
+          "pumpdown": null,
+          "fluid": null,
+          "measurement_sources": {
+            "frac": [
+              {
+                "name": "M1",
+                "label": "S1",
+                "type": "frac",
+                "attached_sites": [
+                  1112,
+                  1113,
+                  1111
+                ],
+                "active_site": null
+              },
+              {
+                "name": "M2",
+                "label": "S2",
+                "type": "frac",
+                "attached_sites": [
+                  1112,
+                  1113,
+                  1111
+                ],
+                "active_site": null
+              }
+            ],
+            "wl": [],
+            "fluid": [],
+            "pumpdown": []
+          },
+          "exc_fields": [
+            "clean_analytics_spool_conductivity",
+            "clean__corrosion_actual",
+            "slurry__corrosion_actual",
+            "clean__density_actual",
+            "clean__temp_actual",
+            "clean__viscosity_actual",
+            "slurry__density_actual",
+            "slurry__temp_actual",
+            "slurry__viscosity_actual",
+            "slurry_analytics_spool_conductivity_25C",
+            "chloride_concentration"
+          ]
+        }
+      },
+      "latitude": 32.3387391,
+      "db": "Demo_Restream",
+      "longitude": -101.3493862,
+      "timezone": "US/Central",
+      "memcache_read": false,
+      "memcache_write": false,
+      "primary_color": null
+    },
+    "site_component_configuration": {
+      "id": 189,
+      "site": 1112,
+      "component_configurations": [
+        {
+          "id": 1000,
+          "component": {
+            "id": 214,
+            "component_type": {
+              "id": 2,
+              "name": "stem_indicator",
+              "description": "Stem Indicator"
+            },
+            "serial_number": "ms114_05_vps_angle_raw-demo",
+            "component_type_name": "stem_indicator",
+            "valve_safety_buffer_limit": 15
+          },
+          "measurement_location": {
+            "id": 5,
+            "name": "upper_master_valve",
+            "location": "Upper Master Valve",
+            "description": "Upper Master Valve"
+          },
+          "condition_logic_set": {
+            "id": 10,
+            "name": "Sick VPS",
+            "description": "",
+            "schema": {
+              "default_state": "N",
+              "condition_logics": [
+                {
+                  "type": "SimpleConditionLogicSchema",
+                  "operator": "<",
+                  "comparison_value": "0",
+                  "resulting_condition": "N"
+                },
+                {
+                  "type": "SimpleConditionLogicSchema",
+                  "operator": ">",
+                  "comparison_value": "180",
+                  "resulting_condition": "N"
+                },
+                {
+                  "type": "SimpleConditionLogicSchema",
+                  "operator": "<",
+                  "comparison_value": "90",
+                  "resulting_condition": "O"
+                },
+                {
+                  "type": "SimpleConditionLogicSchema",
+                  "operator": "<",
+                  "comparison_value": "180",
+                  "resulting_condition": "C"
+                }
+              ]
+            }
+          },
+          "current_state": "O",
+          "date_created": "2024-08-06T18:54:32.921931Z",
+          "last_state_update": "2025-10-09T08:41:52.868736Z",
+          "last_updated": "2025-10-09T08:42:54.922101Z",
+          "pumpdown_sim_valve": null,
+          "downhole_sim_valve": null,
+          "field_name": null,
+          "last_value": "36.0",
+          "inactivity_threshold": 300
+        },
+        {
+          "id": 1001,
+          "component": {
+            "id": 215,
+            "component_type": {
+              "id": 2,
+              "name": "stem_indicator",
+              "description": "Stem Indicator"
+            },
+            "serial_number": "ms114_06_vps_angle_raw-demo",
+            "component_type_name": "stem_indicator",
+            "valve_safety_buffer_limit": 15
+          },
+          "measurement_location": {
+            "id": 4,
+            "name": "swab_valve",
+            "location": "Swab Valve",
+            "description": "Swab Valve"
+          },
+          "condition_logic_set": {
+            "id": 10,
+            "name": "Sick VPS",
+            "description": "",
+            "schema": {
+              "default_state": "N",
+              "condition_logics": [
+                {
+                  "type": "SimpleConditionLogicSchema",
+                  "operator": "<",
+                  "comparison_value": "0",
+                  "resulting_condition": "N"
+                },
+                {
+                  "type": "SimpleConditionLogicSchema",
+                  "operator": ">",
+                  "comparison_value": "180",
+                  "resulting_condition": "N"
+                },
+                {
+                  "type": "SimpleConditionLogicSchema",
+                  "operator": "<",
+                  "comparison_value": "90",
+                  "resulting_condition": "O"
+                },
+                {
+                  "type": "SimpleConditionLogicSchema",
+                  "operator": "<",
+                  "comparison_value": "180",
+                  "resulting_condition": "C"
+                }
+              ]
+            }
+          },
+          "current_state": "O",
+          "date_created": "2024-08-06T18:54:32.990237Z",
+          "last_state_update": "2025-10-09T08:41:52.869271Z",
+          "last_updated": "2025-10-09T08:42:54.922118Z",
+          "pumpdown_sim_valve": null,
+          "downhole_sim_valve": null,
+          "field_name": null,
+          "last_value": "40.499999999999986",
+          "inactivity_threshold": 300
+        }
+      ],
+      "site_name": "Jessica 3WB",
+      "date_created": "2024-08-06T18:54:33.018347Z",
+      "valve_tree_layout": 2
+    },
+    "truth_table": {
+      "id": 31,
+      "name": "Upper/Crown",
+      "description": "",
+      "schema": {
+        "rows": [
+          {
+            "state": "standby_standby",
+            "conditions": [
+              "C"
+            ]
+          },
+          {
+            "state": "frac_frac",
+            "conditions": [
+              "O",
+              "C"
+            ]
+          },
+          {
+            "state": "wl_runinhole",
+            "conditions": [
+              "O",
+              "O"
+            ]
+          }
+        ],
+        "conditions_order": [
+          "upper_master_valve",
+          "swab_valve"
+        ]
+      }
+    },
+    "current_state": "wl_runinhole",
+    "actual_stage_number": null,
+    "completed_stage_number": 35,
+    "site_name": "Jessica 3WB",
+    "date_created": "2025-10-09T08:42:54.930335Z",
+    "last_updated": "2025-10-09T08:42:54.878168Z",
+    "last_state_update": "2025-10-09T08:05:41Z",
+    "truth_table_calculating": false,
+    "calculated_stage_number": 36,
+    "state_change_primary_field_values": {
+      "M1": {},
+      "M2": {
+        "down_hole_pressure": {
+          "value": 0.0,
+          "timestamp": 1759997090
+        }
+      }
+    },
+    "last_state_update_system_time": "2025-10-09T08:05:43.976386Z",
+    "last_state_confirmation_time": "2025-10-09T08:42:53Z",
+    "previous_state": 9133745
+  }
+]

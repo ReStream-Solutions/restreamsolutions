@@ -1,0 +1,56 @@
+{
+  "id": 697,
+  "name": "Arrakis",
+  "lease_name": "Leto",
+  "customer_name": "ReStream Solutions",
+  "simops_config": {
+    "frac": "run",
+    "wireline": null,
+    "pumpdown": null,
+    "fluid": null,
+    "measurement_sources": {
+      "frac": [
+        {
+          "name": "M1",
+          "label": "S1",
+          "type": "frac",
+          "attached_sites": [
+            1111,
+            1112,
+            1113
+          ],
+          "active_site": 1112
+        },
+        {
+          "name": "M2",
+          "label": "S2",
+          "type": "frac",
+          "attached_sites": [
+            1111,
+            1112,
+            1113
+          ],
+          "active_site": null
+        }
+      ],
+      "wl": [],
+      "fluid": [],
+      "pumpdown": []
+    },
+    "exc_fields": [
+      "clean_analytics_spool_conductivity",
+      "clean__corrosion_actual",
+      "slurry__corrosion_actual",
+      "clean__density_actual",
+      "clean__temp_actual",
+      "clean__viscosity_actual",
+      "slurry__density_actual",
+      "slurry__temp_actual",
+      "slurry__viscosity_actual",
+      "slurry_analytics_spool_conductivity_25C",
+      "chloride_concentration"
+    ]
+  },
+  "completion_date": null,
+  "wireline_enabled": true
+}
