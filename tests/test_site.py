@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 from datetime import datetime, timezone
 
+import pandas as pd
 import pytest
 
 from datastore_sdk.constants import (
@@ -431,6 +432,20 @@ def test_site_get_data(monkeypatch):
     finally:
         try:
             out_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    # Also verify CSV save
+    out_csv = BASE / 'tmp_data_sync.csv'
+    try:
+        data_obj.save(str(out_csv), overwrite=True)
+        df_csv = pd.read_csv(out_csv)
+        df_expected = pd.DataFrame(payload)
+        assert len(df_csv) == len(df_expected)
+        assert set(df_csv.columns) == set(df_expected.columns)
+    finally:
+        try:
+            out_csv.unlink()
         except FileNotFoundError:
             pass
 

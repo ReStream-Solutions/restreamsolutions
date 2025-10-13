@@ -317,8 +317,8 @@ for one_second_item in data_obj.data_fetcher:
 
 #### Saving data to a file
 
-You can easily save the data to a JSON file. If `overwrite=False` (the default) and the file already exists, 
-a `FileExistsError` will be raised.
+You can save the data to a JSON or CSV file. The format is chosen by the file extension (.json or .csv). 
+If `overwrite=False` (the default) and the file already exists, a `FileExistsError` will be raised.
 
 ```python
 from datetime import datetime, timezone
@@ -332,7 +332,11 @@ data_obj = pad.get_data(
     stage_name_filter=StageNameFilters.FRAC
 )
 
+# Save as JSON
 data_obj.save('./data/data.json', overwrite=True)
+
+# Or save as CSV
+data_obj.save('./data/data.csv', overwrite=True)
 ```
 
 ### Handling Data Changes
@@ -364,8 +368,10 @@ for event in change_events:
 for one_second_item in changed_data.data_fetcher:
     print(one_second_item)
 
-# Save the changed data to a file
+# Save the changed data to a JSON file
 changed_data.save('./data/data_changes.json', overwrite=True)
+# Save the changed data to a CSV file
+changed_data.save('./data/data_changes.csv', overwrite=True)
 
 # Confirm that all data change events have been received and processed
 for event in change_events:

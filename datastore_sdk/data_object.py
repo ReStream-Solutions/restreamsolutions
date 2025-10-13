@@ -1,26 +1,67 @@
+import asyncio
 import json
 from typing import Generator, AsyncGenerator, Callable
 from pathlib import Path
 
 import aiofiles
+import pandas as pd
 
 
-class Data:
-    """Synchronous wrapper around a data generator that streams JSON data from an HTTP source.
+class BaseData:
+    """Common utilities for data streaming classes."""
+
+    @classmethod
+    def _check_and_prepare_path(cls, path: str, overwrite: bool) -> Path:
+        """Validate and prepare an output path for saving.
+
+        - Ensures parent directories exist.
+        - Verifies the extension is either .json or .csv.
+        - Removes the existing file if overwrite=True; otherwise raises FileExistsError.
+
+        Args:
+            path: Destination file path as a string.
+            overwrite: Whether to overwrite an existing file.
+
+        Returns:
+            A pathlib.Path instance.
+        """
+        path = Path(path)
+        if path.suffix not in [".json", ".csv"]:
+            raise ValueError(f"Invalid file extension '{path.suffix}', must be 'json' or 'csv'")
+        if path.exists():
+            if not overwrite:
+                raise FileExistsError(f"File {path} already exists")
+            else:
+                path.unlink()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @staticmethod
+    def _get_temp_json_path(json_path: Path) -> Path:
+        return json_path.parent / f".{json_path.stem}.json"
+
+    @staticmethod
+    def convert_json_csv(json_path: Path, csv_path: Path):
+        df = pd.read_json(json_path, convert_dates=False)
+        df.to_csv(csv_path, index=False)
+
+
+class Data(BaseData):
+    """Synchronous wrapper around a data generator that streams data from an HTTP source.
 
     It lets you process the incoming stream item by item without loading a potentially
     large response fully into memory and without opening a connection to the server
     until consumption actually begins. The class both exposes a fresh generator via
     the data_fetcher property and allows redirecting the stream to a file for
-    persistence via save().
+    persistence via save() in either JSON or CSV format.
 
     A factory must be provided that returns a new generator on each access. The
     generator should yield dictionaries.
     """
 
-    data_fetcher: Generator[dict, dict, None]
+    data_fetcher: Generator[dict, None, None]
 
-    def __init__(self, data_generator_factory: Callable[[], Generator[dict, dict, None]]) -> None:
+    def __init__(self, data_generator_factory: Callable[[], Generator[dict, None, None]]) -> None:
         """Initialize the Data wrapper.
 
         Args:
@@ -31,7 +72,7 @@ class Data:
         self._data_generator_factory = data_generator_factory
 
     @property
-    def data_fetcher(self) -> Generator[dict, dict, None]:
+    def data_fetcher(self) -> Generator[dict, None, None]:
         """Return a fresh data generator that fetches data from the selected sites or pads.
 
         Returns:
@@ -39,28 +80,16 @@ class Data:
         """
         return self._data_generator_factory()
 
-    def save(self, path: str, overwrite: bool=False):
-        """Save all selected pad/site data to a JSON file.
+    def _save_json(self, path: Path) -> None:
+        """Write the streamed items to a JSON file as a single array.
 
-        The method writes all selected pad/sites data to a JSON file. The JSON file will have
-        a list of dictionaries representing records for a specific site/pad and a timestamp.
-
-        Parent directories are created if missing. If the target file
-        exists and overwrite is False, a FileExistsError is raised. If any
-        exception occurs during writing, the partially written file is removed.
+        Items are written one by one to avoid loading the entire dataset
+        into memory at once.
 
         Args:
-            path: Destination file path.
-            overwrite: If True, replaces an existing file; otherwise raises FileExistsError exception.
+            path: Target file path (should have a .json extension).
         """
-        path = Path(path)
-        if path.exists():
-            if not overwrite:
-                raise FileExistsError(f"File {path} already exists")
-            else:
-                path.unlink()
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding='utf-8') as f:
                 f.write('[')
                 for i, item in enumerate(self.data_fetcher):
@@ -72,18 +101,58 @@ class Data:
             path.unlink(missing_ok=True)
             raise e
 
+    def _save_csv(self, path: Path) -> None:
+        """Write the streamed items to a JSON file and then convert it to a CSV file.
 
-class DataAsync:
-    """Asynchronous wrapper around an async data generator that streams JSON data from an HTTP source.
+        Args:
+            path: Target file path (should have a .csv extension).
+        """
+        temp_json_path = self._get_temp_json_path(path)
+        self._save_json(temp_json_path)
+        try:
+            self.__class__.convert_json_csv(temp_json_path, path)
+        except Exception as e:
+            path.unlink(missing_ok=True)
+            raise e
+        finally:
+            temp_json_path.unlink(missing_ok=True)
+
+    def save(self, path: str, overwrite: bool=False):
+        """Save all selected pad/site data to a JSON or CSV file.
+
+        The method writes all selected pad/sites data either to a JSON file (as a single
+        JSON array of objects) or to a CSV file (with a header derived from the first
+        yielded item). Choose the output by providing a path with a .json or .csv extension.
+
+        Parent directories are created if missing. If the target file
+        exists and overwrite is False, a FileExistsError is raised. If any
+        exception occurs during writing, the partially written file is removed.
+
+        Args:
+            path: Destination file path ending with .json or .csv.
+            overwrite: If True, replaces an existing file; otherwise raises FileExistsError.
+        """
+        path = self.__class__._check_and_prepare_path(path, overwrite)
+        if path.suffix == ".json":
+            self._save_json(path)
+        elif path.suffix == ".csv":
+            self._save_csv(path)
+        else:
+            raise ValueError(f"Invalid file extension '{path.suffix}', must be 'json' or 'csv'")
+
+
+class DataAsync(BaseData):
+    """Asynchronous wrapper around an async data generator that streams data from an HTTP source.
 
     All operations are asynchronous: the connection to the server is not opened
     until consumption of the async stream begins, and items are handled one by one
     without loading a potentially large response fully into memory. The class exposes
     a fresh async generator via the data_fetcher property and allows redirecting the
-    stream to a file using the asynchronous asave() method.
+    stream to a file using the asynchronous asave() method, in either JSON or CSV format.
 
     A factory must be provided that returns a new async generator on each access.
-    The async generator should yield dictionaries.
+    The async generator should yield dictionaries. For CSV output, the header (field names)
+    is derived from the keys of the first yielded item.
     """
 
     data_fetcher: AsyncGenerator[dict, None]
@@ -107,29 +176,16 @@ class DataAsync:
         """
         return self._data_generator_factory()
 
-    async def asave(self, path: str, overwrite: bool = False):
-        """Asynchronously save all selected pad/site data to a JSON file.
+    async def _asave_json(self, path: Path):
+        """Asynchronously write the streamed items to a JSON file as a single array.
 
-        The method writes all selected pad/sites data to a JSON file. The JSON file will have
-        a list of dictionaries representing records for a specific site/pad and a timestamp.
-
-        Parent directories are created if missing. If the target file
-        exists and overwrite is False, a FileExistsError is raised. If any
-        exception occurs during writing, the partially written file is removed.
+        Items are written incrementally to avoid holding the entire dataset in memory.
 
         Args:
-            path: Destination file path.
-            overwrite: If True, replaces an existing file; otherwise raises FileExistsError exception.
+            path: Target file path (should have a .json extension).
         """
-        path = Path(path)
-        if path.exists():
-            if not overwrite:
-                raise FileExistsError(f"File {path} already exists")
-            else:
-                path.unlink()
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            async with aiofiles.open(path, "w", encoding='utf-8') as f:
+            async with aiofiles.open(path, 'w', encoding='utf-8') as f:
                 await f.write('[')
                 first = True
                 async for item in self.data_fetcher:
@@ -141,3 +197,42 @@ class DataAsync:
         except Exception as e:
             path.unlink(missing_ok=True)
             raise e
+
+    async def _asave_csv(self, path: Path):
+        """Asynchronously write the streamed items to a JSON file and then convert it to a CSV file.
+
+        Args:
+            path: Target file path (should have a .csv extension).
+        """
+        temp_json_path = self._get_temp_json_path(path)
+        await self._asave_json(temp_json_path)
+        try:
+            await asyncio.to_thread(self.__class__.convert_json_csv, temp_json_path, path)
+        except Exception as e:
+            path.unlink(missing_ok=True)
+            raise e
+        finally:
+            temp_json_path.unlink(missing_ok=True)
+
+    async def asave(self, path: str, overwrite: bool = False):
+        """Asynchronously save all selected pad/site data to a JSON or CSV file.
+
+        The method writes all selected pad/sites data either to a JSON file (as a single
+        JSON array of objects) or to a CSV file (with a header derived from the first
+        yielded item). Choose the output by providing a path with a .json or .csv extension.
+
+        Parent directories are created if missing. If the target file
+        exists and overwrite is False, a FileExistsError is raised. If any
+        exception occurs during writing, the partially written file is removed.
+
+        Args:
+            path: Destination file path ending with .json or .csv.
+            overwrite: If True, replaces an existing file; otherwise raises FileExistsError.
+        """
+        path = self.__class__._check_and_prepare_path(path, overwrite)
+        if path.suffix == ".json":
+            await self._asave_json(path)
+        elif path.suffix == ".csv":
+            await self._asave_csv(path)
+        else:
+            raise ValueError(f"Invalid file extension '{path.suffix}', must be 'json' or 'csv'")
