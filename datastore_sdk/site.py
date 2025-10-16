@@ -41,6 +41,8 @@ class Site(BasePadSite):
     _api_url_data: str = ENDPOINTS.data_site.value
     _api_url_data_changes_single: str = ENDPOINTS.data_changes_site_one.value
     _api_url_data_changes_multiple: str = ENDPOINTS.data_changes_site_many.value
+    _api_url_data_websocket: str = ENDPOINTS.data_site_websocket.value
+    _api_url_instance_updates_websocket: str = ENDPOINTS.site_updates_websocket.value
 
     # These type hints are used by the BaseInterface class to perform automatic type conversion
     # when a new instance is created.
@@ -359,3 +361,79 @@ class Site(BasePadSite):
             fill_data_limit=fill_data_limit,
             inside_area_only=inside_area_only,
         )
+
+    def get_realtime_updates(self) -> Data:
+        """Creates a Data class, containing a lazy WebSocket stream of real-time updates for this Site.
+
+        data.data_fetcher is a lazy synchronous generator. Each iteration creates a blocking call, waiting for the next
+        update.
+        data.save(path: str, overwrite: bool = False) will save all the data to a JSON file.
+
+        Each message is a JSON object that reflects the current state of this Site and
+        includes some additional properties obtained from related entities.
+        The payload contains the following fields:
+          - id (int)
+          - name (str)
+          - date_created (str, ISO 8601)
+          - latitude (float | None)
+          - longitude (float | None)
+          - lease_name (str)
+          - operator_name (str)
+          - metadata (object):
+              - first_timestamp (str | None, ISO 8601)
+              - last_timestamp (str | None, ISO 8601)
+          - well_api (str | None)
+          - pad_id (int)
+          - is_demo_site (bool)
+          - stage_total (int | None)
+          - timezone (str | None), e.g. "US/Central"
+          - current_stage_number (int | None)
+          - current_state (str | None), e.g. "frac_frac"
+          - current_data_sources (object):
+              - frac (list)
+              - wl (list)
+              - fluid (list)
+              - pumpdown (list)
+
+        Returns:
+            Data: A Data object whose data_fetcher yields update messages one by one.
+        """
+        return super().get_realtime_updates()
+
+    async def aget_realtime_updates(self) -> DataAsync:
+        """Creates a DataAsync class, containing a lazy WebSocket stream of real-time updates for this Site.
+
+        data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next update.
+        data.asave(path: str, overwrite: bool = False) will asynchronously save all the data to a JSON file.
+
+        Each message is a JSON object that reflects the current state of this Site and
+        includes some additional properties obtained from related entities.
+        The payload contains the following fields:
+          - id (int)
+          - name (str)
+          - date_created (str, ISO 8601)
+          - latitude (float | None)
+          - longitude (float | None)
+          - lease_name (str)
+          - operator_name (str)
+          - metadata (object):
+              - first_timestamp (str | None, ISO 8601)
+              - last_timestamp (str | None, ISO 8601)
+          - well_api (str | None)
+          - pad_id (int)
+          - is_demo_site (bool)
+          - stage_total (int | None)
+          - timezone (str | None), e.g. "US/Central"
+          - current_stage_number (int | None)
+          - current_state (str | None), e.g. "frac_frac"
+          - current_data_sources (object):
+              - frac (list)
+              - wl (list)
+              - fluid (list)
+              - pumpdown (list)
+
+        Returns:
+            DataAsync: A DataAsync object whose data_fetcher yields update messages one by one when asynchronously
+            iterated over.
+        """
+        return await super().aget_realtime_updates()

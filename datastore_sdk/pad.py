@@ -36,6 +36,8 @@ class Pad(BasePadSite):
     _api_url_data: str = ENDPOINTS.data_pad.value
     _api_url_data_changes_single: str = ENDPOINTS.data_changes_pad_one.value
     _api_url_data_changes_multiple: str = ENDPOINTS.data_changes_pad_many.value
+    _api_url_data_websocket: str = ENDPOINTS.data_pad_websocket.value
+    _api_url_instance_updates_websocket: str = ENDPOINTS.pad_updates_websocket.value
 
     # These type hints are used by the BaseInterface class to perform automatic type conversion
     # when a new instance is created.
@@ -354,3 +356,61 @@ class Pad(BasePadSite):
             fill_data_limit=fill_data_limit,
             inside_area_only=inside_area_only,
         )
+
+    def get_realtime_updates(self) -> Data:
+        """Creates a Data class, containing a lazy WebSocket stream of real-time updates for this Pad.
+
+        data.data_fetcher is a lazy synchronous generator. Each iteration creates a blocking call, waiting for the next
+        update.
+        data.save(path: str, overwrite: bool = False) will save all the data to a JSON file.
+
+        Each message is a JSON object that reflects the current state of this Pad and may
+        include some additional properties obtained from related entities.
+        The payload contains the following fields:
+          - id (int)
+          - name (str)
+          - lease_name (str)
+          - customer_name (str)
+          - simops_config (object | None):
+              - measurement_sources (object):
+                  - frac (list)
+                  - wl (list)
+                  - fluid (list)
+                  - pumpdown (list)
+              - exc_fields (list)
+          - completion_date (str | None, ISO 8601)
+          - wireline_enabled (bool)
+
+        Returns:
+            Data: A Data object whose data_fetcher yields update messages one by one.
+        """
+        return super().get_realtime_updates()
+
+    async def aget_realtime_updates(self) -> DataAsync:
+        """Creates a DataAsync class, containing a lazy WebSocket stream of real-time updates for this Pad.
+
+        data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next update.
+        data.asave(path: str, overwrite: bool = False) will asynchronously save all the data to a JSON file.
+
+        Each message is a JSON object that reflects the current state of this Pad and may
+        include some additional properties obtained from related entities.
+        The payload contains the following fields:
+          - id (int)
+          - name (str)
+          - lease_name (str)
+          - customer_name (str)
+          - simops_config (object | None):
+              - measurement_sources (object):
+                  - frac (list)
+                  - wl (list)
+                  - fluid (list)
+                  - pumpdown (list)
+              - exc_fields (list)
+          - completion_date (str | None, ISO 8601)
+          - wireline_enabled (bool)
+
+        Returns:
+            DataAsync: A DataAsync object whose data_fetcher yields update messages one by one when asynchronously
+            iterated over.
+        """
+        return await super().aget_realtime_updates()

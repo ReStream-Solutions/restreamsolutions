@@ -32,18 +32,28 @@ class BaseInterface:
             setattr(self, key, self._try_convert_value(key, value))
 
     @classmethod
-    def _format_url(cls, url, **params) -> str:
+    def _format_url(cls, url, is_websocket: bool = False, **params) -> str:
         """Compose a full API URL using the base host and path template.
 
         Args:
             url: API path template (e.g., "/api/v1/resource/{id}").
+            is_websocket: If True, convert the resulting URL to a WebSocket scheme (http->ws, https->wss).
             **params: Parameters to format into the URL template.
 
         Returns:
             The fully formatted absolute URL as a string.
         """
         base_url = os.environ.get('RESTREAM_HOST', RESTREAM_HOST)
-        return f'{base_url}{url}'.format(**params)
+        api_url =  f'{base_url}{url}'.format(**params)
+
+        if not is_websocket:
+            return api_url
+
+        if api_url.startswith('https://'):
+            api_url = api_url.replace('https://', 'wss://')
+        elif api_url.startswith('http://'):
+            api_url = api_url.replace('http://', 'ws://')
+        return api_url
 
     @classmethod
     def _build_single_from_response(cls, json_response, id: int, auth_token: str, as_dict: bool):

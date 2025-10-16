@@ -3421,7 +3421,7 @@ version = "1.8.0"
 description = "WebSocket client for Python with low level API options"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev"]
+groups = ["main", "dev"]
 files = [
     {file = "websocket_client-1.8.0-py3-none-any.whl", hash = "sha256:17b44cc997f5c498e809b22cdf2d9c7a9e71c02c8cc2b6c56e7c2d1239bfa526"},
     {file = "websocket_client-1.8.0.tar.gz", hash = "sha256:3239df9f44da632f96012472805d40a23281a991027ce11d2f45a6f24ac4c3da"},
@@ -3572,4 +3572,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "2f0bde4c008577effd72ecb11b40ee06128f41c51785946b57a58ebf3e4a7e07"
+content-hash = "f105c2be717a88a466c6e7dba50f6be640183bd4f3ffe567e9b5bd86f860943c"

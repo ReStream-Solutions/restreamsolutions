@@ -410,3 +410,212 @@ async def test_steaming_get_generator_async_error_mapping(monkeypatch):
         with pytest.raises(exc):
             async for _ in Communicator.steaming_get_generator_async("https://e", "t"):
                 pass
+
+# ------------------------
+# WebSocket tests
+# ------------------------
+
+def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
+    import datastore_sdk.communicator as comm_module
+    sent = []
+    closed = {"flag": False}
+    captured = {}
+    recv_queue = ["m1", b"m2", None]
+
+    class DummyWS:
+        def __init__(self, skip_utf8_validation=True):
+            assert skip_utf8_validation is True
+        def connect(self, url, header=None):
+            captured["url"] = url
+            captured["header"] = header
+        def recv(self):
+            return recv_queue.pop(0)
+        def send(self, data):
+            sent.append(data)
+        def close(self):
+            closed["flag"] = True
+
+    monkeypatch.setattr(comm_module, "WebSocket", DummyWS)
+
+    gen = comm_module.Communicator.websocket_generator(
+        url="wss://example.org/ws",
+        auth_token="TOKEN123",
+        params={"a": "1"},
+        ack_message={"ack": True},
+        additional_headers=[{"X-Test": "Yes"}],
+    )
+
+    out = list(gen)
+
+    # Yields raw messages and sends ACK for each
+    assert out == ["m1", b"m2"]
+    assert sent == [json.dumps({"ack": True}), json.dumps({"ack": True})]
+
+    # Connection closed in finally
+    assert closed["flag"] is True
+
+    # URL base is correct; depending on requests version, ws scheme may not include query params
+    assert captured["url"].startswith("wss://example.org/ws")
+    if "?" in captured["url"]:
+        assert "a=1" in captured["url"]
+
+    # Headers are provided as list of "Key: Value" strings
+    header_list = captured["header"] or []
+    assert any(h.strip() == "Authorization: Bearer TOKEN123" for h in header_list)
+    assert any(h.strip() == "X-Test: Yes" for h in header_list)
+
+
+def test_websocket_generator_stops_on_connection_closed(monkeypatch):
+    import datastore_sdk.communicator as comm_module
+
+    class DummyWSClosed:
+        def __init__(self, *args, **kwargs):
+            pass
+        def connect(self, url, header=None):
+            pass
+        def recv(self):
+            # Simulate server closing the connection
+            raise comm_module.WebSocketConnectionClosedException()
+        def send(self, data):
+            pass
+        def close(self):
+            DummyWSClosed.closed = True
+
+    DummyWSClosed.closed = False
+
+    monkeypatch.setattr(comm_module, "WebSocket", DummyWSClosed)
+
+    gen = comm_module.Communicator.websocket_generator(
+        url="wss://example.org/ws",
+        auth_token="T",
+    )
+
+    # Should gracefully stop iteration and close the socket
+    assert list(gen) == []
+    assert DummyWSClosed.closed is True
+
+
+async def _collect_async_gen(gen):
+    items = []
+    async for x in gen:
+        items.append(x)
+    return items
+
+
+def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
+    import aiohttp
+    import datastore_sdk.communicator as comm_module
+
+    class DummyWS:
+        def __init__(self, seq, on_send_json):
+            self._iter = iter(seq)
+            self._on_send_json = on_send_json
+        async def receive(self):
+            try:
+                return next(self._iter)
+            except StopIteration:
+                # After CLOSE, context manager will exit
+                return types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSED, data=None)
+        async def send_json(self, payload):
+            self._on_send_json(payload)
+
+    class DummySession:
+        def __init__(self, *args, **kwargs):
+            self.captured = {}
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+        def ws_connect(self, url, headers=None, params=None):
+            self.captured["url"] = url
+            self.captured["headers"] = headers
+            self.captured["params"] = params
+            # Prepare a sequence of TEXT, BINARY, CLOSE
+            seq = [
+                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data="t1"),
+                types.SimpleNamespace(type=aiohttp.WSMsgType.BINARY, data=b"b2"),
+                types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSE, data=None),
+            ]
+            ws = DummyWS(seq, on_send_json=lambda p: self.captured.setdefault("acks", []).append(p))
+            class _Ctx:
+                async def __aenter__(self_inner):
+                    return ws
+                async def __aexit__(self_inner, exc_type, exc, tb):
+                    return False
+            return _Ctx()
+
+    # Capture the created session instance for later inspection
+    holder = {}
+    orig_cls = DummySession
+    def _factory(*args, **kwargs):
+        inst = orig_cls(*args, **kwargs)
+        holder["session"] = inst
+        return inst
+    monkeypatch.setattr(comm_module.aiohttp, "ClientSession", _factory)
+
+    gen = comm_module.Communicator.websocket_generator_async(
+        url="wss://example.org/ws",
+        auth_token="TOKEN-ASYNC",
+        params={"p": "9"},
+        ack_message={"ok": 1},
+        additional_headers=[{"X-Extra": "Z"}],
+    )
+
+    out = asyncio.run(_collect_async_gen(gen))
+
+    assert out == ["t1", b"b2"]
+
+    # Validate headers and params passed to ws_connect
+    captured = holder["session"].captured
+    assert captured["url"] == "wss://example.org/ws"
+    assert captured["params"] == {"p": "9"}
+    headers = captured["headers"]
+    assert headers["Authorization"] == "Bearer TOKEN-ASYNC"
+    assert headers["X-Extra"] == "Z"
+
+    # Two ACKs were sent (for TEXT and BINARY)
+    assert captured["acks"] == [{"ok": 1}, {"ok": 1}]
+
+
+def test_websocket_generator_async_error_raises(monkeypatch):
+    import aiohttp
+    import datastore_sdk.communicator as comm_module
+
+    class DummyWS:
+        def __init__(self, seq):
+            self._iter = iter(seq)
+        async def receive(self):
+            try:
+                return next(self._iter)
+            except StopIteration:
+                return types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSED, data=None)
+
+    class DummyWebsocketSession:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+        def ws_connect(self, url, headers=None, params=None):
+            seq = [types.SimpleNamespace(type=aiohttp.WSMsgType.ERROR, data=None)]
+            ws = DummyWS(seq)
+            class _Ctx:
+                async def __aenter__(self_inner):
+                    return ws
+                async def __aexit__(self_inner, exc_type, exc, tb):
+                    return False
+            return _Ctx()
+
+    monkeypatch.setattr(comm_module.aiohttp, "ClientSession", DummyWebsocketSession)
+
+    async def run():
+        gen = comm_module.Communicator.websocket_generator_async(
+            url="wss://example.org/ws",
+            auth_token="T",
+        )
+        with pytest.raises(RuntimeError):
+            async for _ in gen:
+                pass
+
+    asyncio.run(run())

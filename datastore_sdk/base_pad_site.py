@@ -1,6 +1,6 @@
 import warnings
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Coroutine
 
 from datastore_sdk import StageNameFilters
 from datastore_sdk.base_interface import BaseInterface
@@ -33,6 +33,8 @@ class BasePadSite(BaseInterface):
     _api_url_data: str = None
     _api_url_data_changes_single: str = None
     _api_url_data_changes_multiple: str = None
+    _api_url_data_websocket: str = None
+    _api_url_instance_updates_websocket: str = None
 
     def _mix_stage_metadata_filters(self,
             start: datetime = None,
@@ -424,3 +426,53 @@ class BasePadSite(BaseInterface):
 
         combined_data_async = DataChanges._build_combined_data_async_object(raw_changes, auth_token)
         return changes_list, combined_data_async
+
+    def get_realtime_measurements_data(self, session_key: str = None) -> Data:
+        # TODO - Unfinished
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_data_websocket, is_websocket=True, id=self.id)
+        additional_headers = None
+        if session_key:
+            additional_headers = {'session_key': session_key}
+
+        # This websocket expects to get ACK message after each successful delivery
+        ack_message = {'ack': True}
+
+        data_generator_factory = lambda: Communicator.websocket_generator(
+            url,
+            auth_token=auth_token,
+            ack_message=ack_message,
+            additional_headers=additional_headers,
+        )
+        return Data(data_generator_factory)
+
+    async def aget_realtime_measurements_data(self, session_key: str = None) -> DataAsync:
+        # TODO - Unfinished
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_data_websocket, is_websocket=True, id=self.id)
+        additional_headers = None
+        if session_key:
+            additional_headers = {'session_key': session_key}
+
+        # This websocket expects to get ACK message after each successful delivery
+        ack_message = {'ack': True}
+
+        data_generator_factory = lambda: Communicator.websocket_generator_async(
+            url,
+            auth_token=auth_token,
+            ack_message=ack_message,
+            additional_headers=additional_headers,
+        )
+        return DataAsync(data_generator_factory)
+
+    def get_realtime_updates(self) -> Data:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_instance_updates_websocket, is_websocket=True, id=self.id)
+        data_generator_factory = lambda: Communicator.websocket_generator(url, auth_token=auth_token)
+        return Data(data_generator_factory)
+
+    async def aget_realtime_updates(self) -> DataAsync:
+        auth_token = self._select_token(self._auth_token)
+        url = self._format_url(self._api_url_instance_updates_websocket, is_websocket=True, id=self.id)
+        data_generator_factory = lambda: Communicator.websocket_generator_async(url, auth_token=auth_token)
+        return DataAsync(data_generator_factory)

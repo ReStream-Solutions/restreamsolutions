@@ -393,6 +393,52 @@ async def test_site_aget_measurement_sources_metadata(monkeypatch):
 # Data endpoints (inherited from BasePadSite)
 # ------------------------
 
+def test_site_get_realtime_updates(monkeypatch):
+    token = 'tok'
+    site = Site(id=SITE_ID, auth_token=token)
+    url_http = f"{RESTREAM_HOST}{ENDPOINTS.site_updates_websocket.value}".format(id=site.id)
+    url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
+
+    messages = [{'k1':'v1'}, {'k2':2}, {'k3': None}]
+
+    def fake_ws(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
+        assert url_in == url_wss
+        assert auth_token == token
+        return iter(messages)
+
+    monkeypatch.setattr(Communicator, 'websocket_generator', fake_ws)
+
+    data_obj = site.get_realtime_updates()
+    out = list(data_obj.data_fetcher)
+    assert out == messages
+
+
+@pytest.mark.asyncio
+async def test_site_aget_realtime_updates(monkeypatch):
+    token = 'tok'
+    site = Site(id=SITE_ID, auth_token=token)
+    url_http = f"{RESTREAM_HOST}{ENDPOINTS.site_updates_websocket.value}".format(id=site.id)
+    url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
+
+    messages = [{'k1':'v1'}, {'k2':2}, {'k3': None}]
+
+    def fake_ws_async(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
+        assert url_in == url_wss
+        assert auth_token == token
+        async def _agen():
+            for m in messages:
+                yield m
+        return _agen()
+
+    monkeypatch.setattr(Communicator, 'websocket_generator_async', fake_ws_async)
+
+    data_async = await site.aget_realtime_updates()
+    collected = []
+    async for item in data_async.data_fetcher:
+        collected.append(item)
+    assert collected == messages
+
+
 def test_site_get_data(monkeypatch):
     token = 'tok'
     site = Site(id=SITE_ID, auth_token=token)

@@ -487,6 +487,53 @@ async def test_pad_aget_data(monkeypatch):
 # Data changes endpoints
 # ------------------------
 
+def test_pad_get_realtime_updates(monkeypatch):
+    token = 'tok'
+    pad = Pad(id=999, auth_token=token)
+    # Build expected wss URL
+    url_http = f"{RESTREAM_HOST}{ENDPOINTS.pad_updates_websocket.value}".format(id=pad.id)
+    url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
+
+    messages = [{'k1':'v1'}, {'k2':2}, {'k3': None}]
+
+    def fake_ws(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
+        assert url_in == url_wss
+        assert auth_token == token
+        return iter(messages)
+
+    monkeypatch.setattr(Communicator, 'websocket_generator', fake_ws)
+
+    data_obj = pad.get_realtime_updates()
+    out = list(data_obj.data_fetcher)
+    assert out == messages
+
+
+@pytest.mark.asyncio
+async def test_pad_aget_realtime_updates(monkeypatch):
+    token = 'tok'
+    pad = Pad(id=1001, auth_token=token)
+    url_http = f"{RESTREAM_HOST}{ENDPOINTS.pad_updates_websocket.value}".format(id=pad.id)
+    url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
+
+    messages = [{'k1':'v1'}, {'k2':2}, {'k3': None}]
+
+    def fake_ws_async(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
+        assert url_in == url_wss
+        assert auth_token == token
+        async def _agen():
+            for m in messages:
+                yield m
+        return _agen()
+
+    monkeypatch.setattr(Communicator, 'websocket_generator_async', fake_ws_async)
+
+    data_async = await pad.aget_realtime_updates()
+    collected = []
+    async for item in data_async.data_fetcher:
+        collected.append(item)
+    assert collected == messages
+
+
 def test_pad_get_data_changes(monkeypatch):
     token = 'tok'
     pad = Pad(id=777, auth_token=token)

@@ -1,10 +1,12 @@
 from decimal import Decimal
-from typing import Generator, Any, AsyncGenerator
+from typing import Generator, Any, AsyncGenerator, Optional, Iterable, Dict
 
 import aiohttp
 import requests
 import httpx
 import ijson
+import json
+from websocket import WebSocket, WebSocketConnectionClosedException
 
 from .exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
 
@@ -20,17 +22,30 @@ class Communicator:
     """
 
     @staticmethod
-    def _create_headers(auth_token: str) -> str | None:
-        """Create Authorization headers for Bearer-token based APIs.
+    def _create_headers(
+            auth_token: str,
+            additional_headers: Optional[Iterable[Dict[str, str]]] = None,
+            as_list_of_strings: bool = False,
+    ) -> Optional[Dict[str, str]]:
+        """Create request headers with optional Authorization and merge additional headers.
 
         Parameters:
-            auth_token: The raw access token string. If empty or falsy, no header is produced.
+            auth_token: The raw access token string. If empty or falsy, Authorization is omitted.
+            additional_headers: Optional iterable of dicts with extra headers to merge. Later dicts override earlier ones.
 
         Returns:
-            A headers dictionary with the Authorization field set, or None if no token provided.
+            A headers dictionary or None if neither auth_token nor additional_headers provided.
         """
-        bearer_token = f'Bearer {auth_token}'
-        return {"Authorization": bearer_token} if auth_token else None
+        headers: Dict[str, str] = {}
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
+        if additional_headers:
+            for hdr in additional_headers:
+                if hdr:
+                    headers.update(hdr)
+        if as_list_of_strings:
+            headers = [f"{k}: {v}" for k, v in headers.items()]
+        return headers or None
 
     @staticmethod
     def _check_response_status_code(response: httpx.Response | requests.Response | aiohttp.ClientResponse):
@@ -220,3 +235,98 @@ class Communicator:
                 Communicator._check_response_status_code(stream)
                 async for obj in ijson.items(stream.content, 'item'):
                     yield Communicator._convert_values(obj)
+
+    @staticmethod
+    def websocket_generator(
+        url: str,
+        auth_token: str,
+        params: Optional[dict] = None,
+        ack_message: Optional[dict] = None,
+        additional_headers: Optional[Iterable[Dict[str, str]]] = None,
+    ) -> Generator[Any, None, None]:
+        """Connect to a WebSocket and yield incoming messages synchronously using websocket-client.
+
+        Parameters:
+            url: WebSocket endpoint URL (ws:// or wss://).
+            auth_token: Access token for Authorization header.
+            params: Optional query parameters passed to the connection (added to URL using requests' prepared request).
+            ack_message: Optional dict to send as JSON after each received message as an ACK.
+            additional_headers: Optional list of dicts to merge into the request headers.
+
+        Yields:
+            Raw message payloads as provided by the server (str for TEXT, bytes for BINARY).
+        """
+
+        # Build URL with params using requests' PreparedRequest (no custom URL builder)
+        if params:
+            req = requests.Request("GET", url, params=params).prepare()
+            full_url = req.url
+        else:
+            full_url = url
+
+        # Build headers and convert to list of "Key: Value" strings as expected by websocket-client
+        header_list = Communicator._create_headers(auth_token, additional_headers, as_list_of_strings=True)
+        ws = WebSocket(skip_utf8_validation=True)
+        # Use unlimited timeout (blocking). Users can wrap this in their own timeout logic if needed.
+        ws.connect(full_url, header=header_list)
+        try:
+            while True:
+                try:
+                    data = ws.recv()
+                except WebSocketConnectionClosedException:
+                    break
+                if data is None:
+                    break
+                yield data
+                if ack_message:
+                    ws.send(json.dumps(ack_message))
+        finally:
+            try:
+                ws.close()
+            except Exception:
+                pass
+
+    @staticmethod
+    async def websocket_generator_async(
+        url: str,
+        auth_token: str,
+        params: Optional[dict] = None,
+        ack_message: Optional[dict] = None,
+        additional_headers: Optional[Iterable[Dict[str, str]]] = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Connect to a WebSocket and yield incoming messages asynchronously.
+
+        Parameters:
+            url: WebSocket endpoint URL (ws:// or wss://).
+            auth_token: Access token for Authorization header.
+            params: Optional query parameters to append to the URL.
+            ack_message: Optional dict to send as JSON after each received message as an ACK.
+            additional_headers: Optional list of dicts to merge into the request headers.
+
+        Yields:
+            Raw message payloads as provided by the server (str for TEXT, bytes for BINARY).
+        """
+        headers = Communicator._create_headers(auth_token, additional_headers)
+
+        timeout = aiohttp.ClientTimeout(total=None)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.ws_connect(url, headers=headers, params=params) as ws:
+                while True:
+                    msg = await ws.receive()
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        yield msg.data
+                        if ack_message:
+                            await ws.send_json(ack_message)
+                    elif msg.type == aiohttp.WSMsgType.BINARY:
+                        yield msg.data
+                        if ack_message:
+                            await ws.send_json(ack_message)
+                    elif msg.type in (
+                        aiohttp.WSMsgType.CLOSE,
+                        aiohttp.WSMsgType.CLOSING,
+                        aiohttp.WSMsgType.CLOSED,
+                    ):
+                        break
+                    elif msg.type == aiohttp.WSMsgType.ERROR:
+                        raise RuntimeError("WebSocket error")
+                    # Ignore other control frames implicitly
