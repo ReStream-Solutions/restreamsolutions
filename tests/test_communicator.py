@@ -420,7 +420,7 @@ def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
     sent = []
     closed = {"flag": False}
     captured = {}
-    recv_queue = ["m1", b"m2", None]
+    recv_queue = ['{"k1":"v1"}', '{"k2":2}', None]
 
     class DummyWS:
         def __init__(self, skip_utf8_validation=True):
@@ -448,7 +448,7 @@ def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
     out = list(gen)
 
     # Yields raw messages and sends ACK for each
-    assert out == ["m1", b"m2"]
+    assert out ==[{"k1": 'v1'}, {'k2': 2}]
     assert sent == [json.dumps({"ack": True}), json.dumps({"ack": True})]
 
     # Connection closed in finally
@@ -532,8 +532,8 @@ def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
             self.captured["params"] = params
             # Prepare a sequence of TEXT, BINARY, CLOSE
             seq = [
-                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data="t1"),
-                types.SimpleNamespace(type=aiohttp.WSMsgType.BINARY, data=b"b2"),
+                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v1"}'),
+                types.SimpleNamespace(type=aiohttp.WSMsgType.BINARY, data=b'data'),
                 types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSE, data=None),
             ]
             ws = DummyWS(seq, on_send_json=lambda p: self.captured.setdefault("acks", []).append(p))
@@ -563,7 +563,7 @@ def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
 
     out = asyncio.run(_collect_async_gen(gen))
 
-    assert out == ["t1", b"b2"]
+    assert out == [{'k1': 'v1'}, b'data']
 
     # Validate headers and params passed to ws_connect
     captured = holder["session"].captured
@@ -614,7 +614,7 @@ def test_websocket_generator_async_error_raises(monkeypatch):
             url="wss://example.org/ws",
             auth_token="T",
         )
-        with pytest.raises(RuntimeError):
+        with pytest.raises(comm_module.WebsocketError):
             async for _ in gen:
                 pass
 

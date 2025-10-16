@@ -1,6 +1,7 @@
+import secrets
 import warnings
 from datetime import datetime, timezone
-from typing import Any, Coroutine
+from typing import Any, Coroutine, Tuple
 
 from datastore_sdk import StageNameFilters
 from datastore_sdk.base_interface import BaseInterface
@@ -427,43 +428,36 @@ class BasePadSite(BaseInterface):
         combined_data_async = DataChanges._build_combined_data_async_object(raw_changes, auth_token)
         return changes_list, combined_data_async
 
-    def get_realtime_measurements_data(self, session_key: str = None) -> Data:
-        # TODO - Unfinished
+    def _prepare_measurements_websocket_params(self, endpoint_url: str, session_key: str) -> dict[str, Any]:
         auth_token = self._select_token(self._auth_token)
-        url = self._format_url(self._api_url_data_websocket, is_websocket=True, id=self.id)
-        additional_headers = None
-        if session_key:
-            additional_headers = {'session_key': session_key}
+        url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
 
-        # This websocket expects to get ACK message after each successful delivery
-        ack_message = {'ack': True}
+        if not session_key:
+            session_key = secrets.token_hex(16)
+        additional_headers = {'session-key': session_key}
 
-        data_generator_factory = lambda: Communicator.websocket_generator(
-            url,
-            auth_token=auth_token,
-            ack_message=ack_message,
-            additional_headers=additional_headers,
-        )
-        return Data(data_generator_factory)
+        # All measurement WebSockets expect to receive an acknowledgement message after each successful delivery.
+        ack_message = {"ack": True}
+        get_nested_key = 'message'
 
-    async def aget_realtime_measurements_data(self, session_key: str = None) -> DataAsync:
-        # TODO - Unfinished
-        auth_token = self._select_token(self._auth_token)
-        url = self._format_url(self._api_url_data_websocket, is_websocket=True, id=self.id)
-        additional_headers = None
-        if session_key:
-            additional_headers = {'session_key': session_key}
+        return {
+            'auth_token': auth_token,
+            'url': url,
+            'additional_headers': additional_headers,
+            'ack_message': ack_message,
+            'get_nested_key': get_nested_key,
+            'session_key': session_key,
+        }
 
-        # This websocket expects to get ACK message after each successful delivery
-        ack_message = {'ack': True}
+    def get_realtime_measurements_data(self, session_key: str = None) -> Tuple[Data, str]:
+        params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
+        data_generator_factory = lambda: Communicator.websocket_generator(**params)
+        return Data(data_generator_factory), params['session_key']
 
-        data_generator_factory = lambda: Communicator.websocket_generator_async(
-            url,
-            auth_token=auth_token,
-            ack_message=ack_message,
-            additional_headers=additional_headers,
-        )
-        return DataAsync(data_generator_factory)
+    async def aget_realtime_measurements_data(self, session_key: str = None) -> Tuple[DataAsync, str]:
+        params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
+        data_generator_factory = lambda: Communicator.websocket_generator_async(**params)
+        return DataAsync(data_generator_factory), params['session_key']
 
     def get_realtime_updates(self) -> Data:
         auth_token = self._select_token(self._auth_token)

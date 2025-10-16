@@ -16,3 +16,9 @@ class APIConcurrencyLimitError(Exception):
 
     def __init__(self, message: str = "Too many concurrent requests. Please try again later."):
         super().__init__(message)
+
+class WebsocketError(Exception):
+    """Raised when a websocket error occurs."""
+
+    def __init__(self, message: str = "The websocket error occurs."):
+        super().__init__(message)

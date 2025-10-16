@@ -1,14 +1,16 @@
 from decimal import Decimal
-from typing import Generator, Any, AsyncGenerator, Optional, Iterable, Dict
+from typing import Generator, Any, AsyncGenerator, Optional, Iterable, Dict, List
 
 import aiohttp
 import requests
 import httpx
 import ijson
 import json
-from websocket import WebSocket, WebSocketConnectionClosedException
 
-from .exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
+from aiohttp import WSServerHandshakeError
+from websocket import WebSocket, WebSocketConnectionClosedException, WebSocketBadStatusException
+
+from .exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError, WebsocketError
 
 
 class Communicator:
@@ -26,7 +28,7 @@ class Communicator:
             auth_token: str,
             additional_headers: Optional[Iterable[Dict[str, str]]] = None,
             as_list_of_strings: bool = False,
-    ) -> Optional[Dict[str, str]]:
+    ) -> Optional[Dict[str, str] | List[str]]:
         """Create request headers with optional Authorization and merge additional headers.
 
         Parameters:
@@ -36,7 +38,7 @@ class Communicator:
         Returns:
             A headers dictionary or None if neither auth_token nor additional_headers provided.
         """
-        headers: Dict[str, str] = {}
+        headers: Dict[str, str] | List[str] = {}
         if auth_token:
             headers["Authorization"] = f"Bearer {auth_token}"
         if additional_headers:
@@ -48,7 +50,13 @@ class Communicator:
         return headers or None
 
     @staticmethod
-    def _check_response_status_code(response: httpx.Response | requests.Response | aiohttp.ClientResponse):
+    def _check_response_status_code(
+            response: httpx.Response |
+                      requests.Response |
+                      aiohttp.ClientResponse |
+                      WSServerHandshakeError |
+                      WebSocketBadStatusException
+    ):
         """Validate HTTP response status and raise SDK-specific exceptions.
 
         Parameters:
@@ -61,9 +69,9 @@ class Communicator:
             HTTPError: Propagated from the underlying client for other non-2xx codes.
             RuntimeError: If the response type is not supported.
         """
-        if isinstance(response, (httpx.Response, requests.Response)):
+        if isinstance(response, (httpx.Response, requests.Response, WebSocketBadStatusException)):
             status_code = response.status_code
-        elif isinstance(response, aiohttp.ClientResponse):
+        elif isinstance(response, (aiohttp.ClientResponse, WSServerHandshakeError)):
             status_code = response.status
         else:
             raise RuntimeError('Unknown response type')
@@ -73,6 +81,8 @@ class Communicator:
             raise APICompatibilityError("The endpoint does not exist")
         if status_code == 429:
             raise APIConcurrencyLimitError()
+        if isinstance(response, (WSServerHandshakeError, WebSocketBadStatusException)):
+            raise response
         response.raise_for_status()
 
     @staticmethod
@@ -243,6 +253,8 @@ class Communicator:
         params: Optional[dict] = None,
         ack_message: Optional[dict] = None,
         additional_headers: Optional[Iterable[Dict[str, str]]] = None,
+        get_nested_key: str = None,
+        **kwargs,
     ) -> Generator[Any, None, None]:
         """Connect to a WebSocket and yield incoming messages synchronously using websocket-client.
 
@@ -268,18 +280,30 @@ class Communicator:
         header_list = Communicator._create_headers(auth_token, additional_headers, as_list_of_strings=True)
         ws = WebSocket(skip_utf8_validation=True)
         # Use unlimited timeout (blocking). Users can wrap this in their own timeout logic if needed.
-        ws.connect(full_url, header=header_list)
         try:
+            ws.connect(full_url, header=header_list)
             while True:
-                try:
-                    data = ws.recv()
-                except WebSocketConnectionClosedException:
-                    break
+                data = ws.recv()
                 if data is None:
                     break
+                if isinstance(data, str):
+                    data = json.loads(data)
+                if get_nested_key is not None:
+                    data = data[get_nested_key]
                 yield data
                 if ack_message:
                     ws.send(json.dumps(ack_message))
+
+        except WebSocketConnectionClosedException:
+            # Gracefully stop iteration when the server closes the connection
+            return
+
+        except WebSocketBadStatusException as e:
+            Communicator._check_response_status_code(e)
+
+        except (ValueError, KeyError) as e:
+            raise APICompatibilityError(f'Cannot parse WebSocket message: {repr(e)}')
+
         finally:
             try:
                 ws.close()
@@ -293,6 +317,8 @@ class Communicator:
         params: Optional[dict] = None,
         ack_message: Optional[dict] = None,
         additional_headers: Optional[Iterable[Dict[str, str]]] = None,
+        get_nested_key: str = None,
+        **kwargs,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Connect to a WebSocket and yield incoming messages asynchronously.
 
@@ -310,23 +336,36 @@ class Communicator:
 
         timeout = aiohttp.ClientTimeout(total=None)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.ws_connect(url, headers=headers, params=params) as ws:
-                while True:
-                    msg = await ws.receive()
-                    if msg.type == aiohttp.WSMsgType.TEXT:
-                        yield msg.data
-                        if ack_message:
-                            await ws.send_json(ack_message)
-                    elif msg.type == aiohttp.WSMsgType.BINARY:
-                        yield msg.data
-                        if ack_message:
-                            await ws.send_json(ack_message)
-                    elif msg.type in (
-                        aiohttp.WSMsgType.CLOSE,
-                        aiohttp.WSMsgType.CLOSING,
-                        aiohttp.WSMsgType.CLOSED,
-                    ):
-                        break
-                    elif msg.type == aiohttp.WSMsgType.ERROR:
-                        raise RuntimeError("WebSocket error")
-                    # Ignore other control frames implicitly
+            try:
+                async with session.ws_connect(url, headers=headers, params=params) as ws:
+                    while True:
+                        msg = await ws.receive()
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            data = msg.data
+                            if isinstance(data, str):
+                                data = json.loads(data)
+                            if get_nested_key is not None:
+                                # Only attempt to parse JSON and extract when a nested key is requested
+                                data = data[get_nested_key]
+                            yield data
+                            if ack_message:
+                                await ws.send_json(ack_message)
+                        elif msg.type == aiohttp.WSMsgType.BINARY:
+                            yield msg.data
+                            if ack_message:
+                                await ws.send_json(ack_message)
+                        elif msg.type in (
+                            aiohttp.WSMsgType.CLOSE,
+                            aiohttp.WSMsgType.CLOSING,
+                            aiohttp.WSMsgType.CLOSED,
+                        ):
+                            break
+                        elif msg.type == aiohttp.WSMsgType.ERROR:
+                            raise WebsocketError()
+                        # Ignore other control frames implicitly
+
+            except WSServerHandshakeError as e:
+                Communicator._check_response_status_code(e)
+
+            except (KeyError, ValueError) as e:
+                raise APICompatibilityError(f'Cannot parse WebSocket message: {repr(e)}')
