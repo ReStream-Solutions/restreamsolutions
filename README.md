@@ -400,13 +400,13 @@ if change_events:
 
 You can subscribe to a continuous stream of real-time updates for a Pad (or Site) via WebSocket.
 The method returns a lazy Data/DataAsync object whose data_fetcher yields updates one by one.
-Use `get_realtime_updates()` and `aget_realtime_updates()` methods of the Pad and Site classes.
+Use `get_realtime_instance_updates()` and `aget_realtime_instance_updates()` methods of the Pad and Site classes.
 
 ```python
 from datastore_sdk import Pad
 
 pad = Pad(id=681)
-updates = pad.get_realtime_updates()
+updates = pad.get_realtime_instance_updates()
 
 # Iterate over incoming messages (blocking loop)
 for message in updates.data_fetcher:

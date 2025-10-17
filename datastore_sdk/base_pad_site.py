@@ -36,6 +36,7 @@ class BasePadSite(BaseInterface):
     _api_url_data_changes_multiple: str = None
     _api_url_data_websocket: str = None
     _api_url_instance_updates_websocket: str = None
+    _api_url_changelog_updates_websocket: str = None
 
     def _mix_stage_metadata_filters(self,
             start: datetime = None,
@@ -429,6 +430,15 @@ class BasePadSite(BaseInterface):
         return changes_list, combined_data_async
 
     def _prepare_measurements_websocket_params(self, endpoint_url: str, session_key: str) -> dict[str, Any]:
+        """Prepare shared parameters for measurement WebSocket connections.
+
+        Parameters:
+            endpoint_url: URL template for the WebSocket endpoint.
+            session_key: Optional client-provided session key; a random one is generated if not provided.
+
+        Returns:
+            A dict with auth token, formatted URL, headers, ack message config, and the resolved session key.
+        """
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
 
@@ -450,23 +460,122 @@ class BasePadSite(BaseInterface):
         }
 
     def get_realtime_measurements_data(self, session_key: str = None) -> Tuple[Data, str]:
+        """Open a WebSocket stream of real-time measurements (sync).
+
+        Parameters:
+            session_key: Optional session identifier to resume/associate a stream.
+
+        Returns:
+            A tuple of (Data, session_key) where Data lazily yields messages and session_key is the key in use.
+        """
         params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
         data_generator_factory = lambda: Communicator.websocket_generator(**params)
         return Data(data_generator_factory), params['session_key']
 
     async def aget_realtime_measurements_data(self, session_key: str = None) -> Tuple[DataAsync, str]:
+        """Open a WebSocket stream of real-time measurements (async).
+
+        Parameters:
+            session_key: Optional session identifier to resume/associate a stream.
+
+        Returns:
+            A tuple of (DataAsync, session_key) where DataAsync lazily yields messages on async iteration.
+        """
         params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
         data_generator_factory = lambda: Communicator.websocket_generator_async(**params)
         return DataAsync(data_generator_factory), params['session_key']
 
-    def get_realtime_updates(self) -> Data:
+    def _get_real_time_updates_object(self, endpoint_url: str) -> Data:
+        """Helper to build a Data object for a generic real-time WebSocket endpoint (sync)."""
         auth_token = self._select_token(self._auth_token)
-        url = self._format_url(self._api_url_instance_updates_websocket, is_websocket=True, id=self.id)
+        url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
         data_generator_factory = lambda: Communicator.websocket_generator(url, auth_token=auth_token)
         return Data(data_generator_factory)
 
-    async def aget_realtime_updates(self) -> DataAsync:
+    async def _aget_real_time_updates_object(self, endpoint_url: str) -> DataAsync:
+        """Helper to build a DataAsync for a generic real-time WebSocket endpoint (async)."""
         auth_token = self._select_token(self._auth_token)
-        url = self._format_url(self._api_url_instance_updates_websocket, is_websocket=True, id=self.id)
+        url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
         data_generator_factory = lambda: Communicator.websocket_generator_async(url, auth_token=auth_token)
         return DataAsync(data_generator_factory)
+
+    def get_realtime_instance_updates(self) -> Data:
+        """Get a Data stream of real-time instance (Pad/Site) updates over WebSocket (sync)."""
+        return self._get_real_time_updates_object(self._api_url_instance_updates_websocket)
+
+    async def aget_realtime_instance_updates(self) -> DataAsync:
+        """Get a DataAsync stream of real-time instance (Pad/Site) updates over WebSocket (async)."""
+        return await self._aget_real_time_updates_object(self._api_url_instance_updates_websocket)
+
+    def get_realtime_data_changes_updates(self) -> Data:
+        """Create a Data object that provides a lazy WebSocket stream of real-time data-change
+        events for this Pad/Site.
+
+        data.data_fetcher is a lazy synchronous generator. Each iteration blocks until the next
+        update message is received. You can also persist the stream to a file via
+        data.save(path: str, overwrite: bool = False).
+
+        Each message is a JSON object describing a single change event in the data for a specific site.
+        A typical payload contains the following fields (example shown below):
+          - id (int): Unique identifier of the change event.
+          - created_at (str, ISO 8601): Timestamp when the change was recorded on the server.
+          - modification_type (str): One of "translation_layer" or "transaction".
+          - modification_subtype (str): Specific change action, e.g. "move", "move_delete", "move_copy",
+            "delete", "augment", "augment_update", "augment_insert", "annotate", "override", "add",
+            "change", "reverse".
+          - start_date (str, ISO 8601): Start of the affected time interval.
+          - end_date (str, ISO 8601): End of the affected time interval.
+          - site (int): Identifier of the parent site.
+
+        Example message:
+            {
+                "id": 61285,
+                "created_at": "2025-10-17T11:39:43.688700Z",
+                "modification_type": "translation_layer",
+                "modification_subtype": "add",
+                "start_date": "2022-06-29T19:25:52Z",
+                "end_date": "2025-10-17T11:39:44.687991Z",
+                "site": 1173
+            }
+
+        Returns:
+            Data: A Data object whose data_fetcher yields update messages one by one.
+        """
+        return self._get_real_time_updates_object(self._api_url_changelog_updates_websocket)
+
+    async def aget_realtime_data_changes_updates(self) -> DataAsync:
+        """Create a DataAsync object that provides a lazy WebSocket stream of real-time
+        data-change events for this Pad/Site.
+
+        data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next
+        update message. You can also persist the stream to a file via
+        data.asave(path: str, overwrite: bool = False).
+
+        Each message is a JSON object describing a single change event in the data for a specific site.
+        A typical payload contains the following fields (example shown below):
+          - id (int): Unique identifier of the change event.
+          - created_at (str, ISO 8601): Timestamp when the change was recorded on the server.
+          - modification_type (str): One of "translation_layer" or "transaction".
+          - modification_subtype (str): Specific change action, e.g. "move", "move_delete", "move_copy",
+            "delete", "augment", "augment_update", "augment_insert", "annotate", "override", "add",
+            "change", "reverse".
+          - start_date (str, ISO 8601): Start of the affected time interval.
+          - end_date (str, ISO 8601): End of the affected time interval.
+          - site (int): Identifier of the parent site.
+
+        Example message:
+            {
+                "id": 61285,
+                "created_at": "2025-10-17T11:39:43.688700Z",
+                "modification_type": "translation_layer",
+                "modification_subtype": "add",
+                "start_date": "2022-06-29T19:25:52Z",
+                "end_date": "2025-10-17T11:39:44.687991Z",
+                "site": 1173
+            }
+
+        Returns:
+            DataAsync: A DataAsync object whose data_fetcher yields update messages one by one when
+            asynchronously iterated over.
+        """
+        return await self._aget_real_time_updates_object(self._api_url_changelog_updates_websocket)

@@ -37,6 +37,8 @@ class ENDPOINTS(Enum):
     data_pad_websocket = '/ws/data/pad/{id}/'
     site_updates_websocket = '/external/thirdparty/v2/ws/sites/{id}/'
     pad_updates_websocket = '/external/thirdparty/v2/ws/pads/{id}/'
+    site_changelog_updates_websocket = '/external/thirdparty/v2/ws/sites/{id}/data_changes/'
+    pad_changelog_updates_websocket = '/external/thirdparty/v2/ws/pads/{id}/data_changes/'
 
 class StageNameFilters(Enum):
     """Short codes used to filter stage history by operation type."""

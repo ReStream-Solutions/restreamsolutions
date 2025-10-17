@@ -38,6 +38,7 @@ class Pad(BasePadSite):
     _api_url_data_changes_multiple: str = ENDPOINTS.data_changes_pad_many.value
     _api_url_data_websocket: str = ENDPOINTS.data_pad_websocket.value
     _api_url_instance_updates_websocket: str = ENDPOINTS.pad_updates_websocket.value
+    _api_url_changelog_updates_websocket: str = ENDPOINTS.pad_changelog_updates_websocket.value
 
     # These type hints are used by the BaseInterface class to perform automatic type conversion
     # when a new instance is created.
@@ -357,7 +358,7 @@ class Pad(BasePadSite):
             inside_area_only=inside_area_only,
         )
 
-    def get_realtime_updates(self) -> Data:
+    def get_realtime_instance_updates(self) -> Data:
         """Creates a Data class, containing a lazy WebSocket stream of real-time updates for this Pad.
 
         data.data_fetcher is a lazy synchronous generator. Each iteration creates a blocking call, waiting for the next
@@ -384,9 +385,9 @@ class Pad(BasePadSite):
         Returns:
             Data: A Data object whose data_fetcher yields update messages one by one.
         """
-        return super().get_realtime_updates()
+        return super().get_realtime_instance_updates()
 
-    async def aget_realtime_updates(self) -> DataAsync:
+    async def aget_realtime_instance_updates(self) -> DataAsync:
         """Creates a DataAsync class, containing a lazy WebSocket stream of real-time updates for this Pad.
 
         data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next update.
@@ -413,4 +414,4 @@ class Pad(BasePadSite):
             DataAsync: A DataAsync object whose data_fetcher yields update messages one by one when asynchronously
             iterated over.
         """
-        return await super().aget_realtime_updates()
+        return await super().aget_realtime_instance_updates()
