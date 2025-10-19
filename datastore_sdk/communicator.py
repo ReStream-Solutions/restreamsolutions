@@ -1,5 +1,9 @@
+import asyncio
+import time
+import functools
 from decimal import Decimal
 from typing import Generator, Any, AsyncGenerator, Optional, Iterable, Dict, List
+import warnings
 
 import aiohttp
 import requests
@@ -11,6 +15,76 @@ from aiohttp import WSServerHandshakeError
 from websocket import WebSocket, WebSocketConnectionClosedException, WebSocketBadStatusException
 
 from .exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError, WebsocketError
+
+
+def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float = 1, factor: float = 4.0):
+    """A decorator that retries a function with exponential backoff on exceptions.
+
+    Supports both synchronous and asynchronous functions. Will not retry on
+    AuthError, APICompatibilityError, or APIConcurrencyLimitError, propagating
+    them immediately.
+
+    Can be used with or without parameters:
+        @exponential_backoff
+        @exponential_backoff(attempts=5, initial_delay=1.0)
+
+    Parameters:
+        attempts: Total number of attempts to try (including the first call).
+        initial_delay: Delay before the first retry in seconds.
+        factor: Multiplier applied to the delay after each failed attempt.
+    """
+
+    def decorator(func):
+        if attempts < 1:
+            raise ValueError("attempts must be >= 1")
+
+        is_coro = asyncio.iscoroutinefunction(func)
+
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            delay = initial_delay
+            for i in range(attempts):
+                try:
+                    return await func(*args, **kwargs)
+                except (AuthError, APICompatibilityError, APIConcurrencyLimitError):
+                    # Do not retry on these errors
+                    raise
+                except Exception as e:
+                    if i == attempts - 1:
+                        raise
+                    warnings.warn(
+                        f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
+                        RuntimeWarning
+                    )
+                    await asyncio.sleep(delay)
+                    delay *= factor
+
+        @functools.wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            delay = initial_delay
+            for i in range(attempts):
+                try:
+                    return func(*args, **kwargs)
+                except (AuthError, APICompatibilityError, APIConcurrencyLimitError):
+                    # Do not retry on these errors
+                    raise
+                except Exception as e:
+                    if i == attempts - 1:
+                        raise
+                    warnings.warn(
+                        f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
+                        RuntimeWarning
+                    )
+                    time.sleep(delay)
+                    delay *= factor
+
+        return async_wrapper if is_coro else sync_wrapper
+
+    # If used without parentheses: @exponential_backoff
+    if _func is None:
+        return decorator
+    else:
+        return decorator(_func)
 
 
 class Communicator:
@@ -111,6 +185,7 @@ class Communicator:
 
 
     @staticmethod
+    @exponential_backoff
     def send_get_request(url: str, auth_token: str, **params) -> dict | list:
         """Send a synchronous HTTP GET request.
 
@@ -131,6 +206,7 @@ class Communicator:
         return response.json()
 
     @staticmethod
+    @exponential_backoff
     async def send_get_request_async(url: str, auth_token: str, **params) -> dict | list:
         """Send an asynchronous HTTP GET request.
 
@@ -152,6 +228,7 @@ class Communicator:
         return response.json()
 
     @staticmethod
+    @exponential_backoff
     def send_post_request(url: str, auth_token: str, payload: dict,  **params) -> dict | list:
         """Send a synchronous HTTP POST request with a JSON payload.
 
@@ -173,6 +250,7 @@ class Communicator:
         return response.json()
 
     @staticmethod
+    @exponential_backoff
     async def send_post_request_async(url: str, auth_token: str, payload: dict, **params) -> dict | list:
         """Send an asynchronous HTTP POST request using httpx.AsyncClient.
 
