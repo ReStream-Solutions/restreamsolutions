@@ -69,5 +69,7 @@ class DataAggregations(Enum):
 
 
 class DataFillMethods(Enum):
+    """Fill methods supported by the API when querying time-series data."""
+
     BACKWARD_FILL = 'bfill'
     FORWARD_FILL = 'ffill'
