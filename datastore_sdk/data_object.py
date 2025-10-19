@@ -1,10 +1,14 @@
 import asyncio
 import json
+import time
+import warnings
 from typing import Generator, AsyncGenerator, Callable
 from pathlib import Path
 
 import aiofiles
 import pandas as pd
+
+from datastore_sdk.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
 
 
 class BaseData:
@@ -61,24 +65,62 @@ class Data(BaseData):
 
     data_fetcher: Generator[dict, None, None]
 
-    def __init__(self, data_generator_factory: Callable[[], Generator[dict, None, None]]) -> None:
+    def __init__(
+            self,
+            data_generator_factory: Callable[[],
+            Generator[dict, None, None]],
+            restart_on_error: bool = False,
+            restart_on_close: bool = False,
+    ) -> None:
         """Initialize the Data wrapper.
 
         Args:
             data_generator_factory: A callable that returns a new generator which
                 yields dict items to be saved or processed. A new generator should be created
                 on each call so that the instance of the Data class could be reusable.
+            restart_on_error: If True, the data_fetcher will automatically recreate the
+                underlying generator via the factory when an error occurs during iteration,
+                and continue yielding subsequent items. If False, the error is propagated.
+            restart_on_close: If True, the wrapper will also recreate the underlying generator
+                when it completes normally (e.g., a WebSocket closes cleanly) and continue
+                streaming. If False, normal completion will finish the stream.
         """
         self._data_generator_factory = data_generator_factory
+        self._restart_on_error = restart_on_error
+        self._restart_on_close = restart_on_close
 
     @property
     def data_fetcher(self) -> Generator[dict, None, None]:
         """Return a fresh data generator that fetches data from the selected sites or pads.
 
+        The returned generator is a wrapper over the underlying generator from the
+        factory. If restart_on_error=True, it will recreate the underlying generator
+        when an exception occurs and continue yielding items. If restart_on_close=True,
+        it will also recreate the generator when it completes normally (e.g., clean WebSocket close)
+        and continue streaming.
+
         Returns:
             Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
         """
-        return self._data_generator_factory()
+        def _wrapper():
+            while True:
+                gen = self._data_generator_factory()
+                try:
+                    for item in gen:
+                        yield item
+                    if not self._restart_on_close:
+                        break  # normal completion
+                except (AuthError, APICompatibilityError, APIConcurrencyLimitError):
+                    # Do not retry on these errors
+                    raise
+                except Exception as e:
+                    if not self._restart_on_error:
+                        raise
+                    # else: recreate and continue loop
+                    warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
+                    time.sleep(1)
+                    continue
+        return _wrapper()
 
     def _save_json(self, path: Path) -> None:
         """Write the streamed items to a JSON file as a single array.
@@ -157,24 +199,61 @@ class DataAsync(BaseData):
 
     data_fetcher: AsyncGenerator[dict, None]
 
-    def __init__(self, data_generator_factory: Callable[[], AsyncGenerator[dict, None]]) -> None:
+    def __init__(
+            self,
+            data_generator_factory: Callable[[],
+            AsyncGenerator[dict, None]],
+            restart_on_error: bool = False,
+            restart_on_close: bool = False,
+    ) -> None:
         """Initialize the asynchronous Data wrapper.
 
         Args:
             data_generator_factory: A callable that returns a new async generator which
                 yields dict items to be saved or processed. A new generator should be created
                 on each call so that the instance of the DataAsync class could be reusable.
+            restart_on_error: If True, the data_fetcher will automatically recreate the
+                underlying async generator via the factory when an error occurs during
+                iteration, and continue yielding subsequent items. If False, the error is propagated.
+            restart_on_close: If True, the wrapper will also recreate the underlying async generator
+                when it completes normally (e.g., a WebSocket closes cleanly) and continue
+                streaming. If False, normal completion will finish the stream.
         """
         self._data_generator_factory = data_generator_factory
+        self._restart_on_error = restart_on_error
+        self._restart_on_close = restart_on_close
 
     @property
     def data_fetcher(self) -> AsyncGenerator[dict, None]:
         """Return a fresh  async data generator that fetches data from the selected sites or pads.
 
+        The returned async generator is a wrapper over the underlying generator from the
+        factory. If restart_on_error=True, it will recreate the underlying generator when
+        an exception occurs and continue yielding items. If restart_on_close=True, it will also
+        recreate the generator when it completes normally (e.g., clean WebSocket close) and continue streaming.
+
         Returns:
             Async Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
         """
-        return self._data_generator_factory()
+        async def _wrapper():
+            while True:
+                agen = self._data_generator_factory()
+                try:
+                    async for item in agen:
+                        yield item
+                    if not self._restart_on_close:
+                        break  # normal completion
+                except (AuthError, APICompatibilityError, APIConcurrencyLimitError):
+                    # Do not retry on these errors
+                    raise
+                except Exception as e:
+                    if not self._restart_on_error:
+                        raise
+                    # else: recreate and continue loop
+                    warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
+                    await asyncio.sleep(1)
+                    continue
+        return _wrapper()
 
     async def _asave_json(self, path: Path):
         """Asynchronously write the streamed items to a JSON file as a single array.

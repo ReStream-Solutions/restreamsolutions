@@ -358,8 +358,14 @@ class Pad(BasePadSite):
             inside_area_only=inside_area_only,
         )
 
-    def get_realtime_instance_updates(self) -> Data:
+    def get_realtime_instance_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:
         """Creates a Data class, containing a lazy WebSocket stream of real-time updates for this Pad.
+
+        Parameters:
+            restart_on_error: If True (default), the returned Data instance will automatically attempt to reconnect
+            to the server if an error occurs.
+            restart_on_close: If True (default), the Data wrapper will also recreate the underlying generator when
+            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
 
         data.data_fetcher is a lazy synchronous generator. Each iteration creates a blocking call, waiting for the next
         update.
@@ -385,10 +391,20 @@ class Pad(BasePadSite):
         Returns:
             Data: A Data object whose data_fetcher yields update messages one by one.
         """
-        return super().get_realtime_instance_updates()
+        return super().get_realtime_instance_updates(restart_on_error=restart_on_error, restart_on_close=restart_on_close)
 
-    async def aget_realtime_instance_updates(self) -> DataAsync:
+    async def aget_realtime_instance_updates(
+            self,
+            restart_on_error: bool = True,
+            restart_on_close: bool = True,
+    ) -> DataAsync:
         """Creates a DataAsync class, containing a lazy WebSocket stream of real-time updates for this Pad.
+
+        Parameters:
+            restart_on_error: If True (default), the returned DataAsync instance will automatically attempt to reconnect
+            to the server if an error occurs.
+            restart_on_close: If True (default), the DataAsync wrapper will also recreate the underlying async generator when
+            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
 
         data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next update.
         data.asave(path: str, overwrite: bool = False) will asynchronously save all the data to a JSON file.
@@ -414,4 +430,7 @@ class Pad(BasePadSite):
             DataAsync: A DataAsync object whose data_fetcher yields update messages one by one when asynchronously
             iterated over.
         """
-        return await super().aget_realtime_instance_updates()
+        return await super().aget_realtime_instance_updates(
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close
+        )

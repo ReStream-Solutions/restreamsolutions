@@ -261,6 +261,16 @@ class BasePadSite(BaseInterface):
             - measurement_sources_names (str | list[str] | None): names to filter by measurement source.
             - is_routed (bool | None): For pads entities only. If true - returns the data separately for each site,
             otherwise each item will contain data for the entire pad for a given timestamp.
+            - fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
+                to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
+                to fill missing values backward before the next known value. If provided, resolution must be
+                DataResolutions.SECOND and aggregation must be None.
+            - fill_data_limit (int | None): Required when fill_data_method is provided. Maximum number of seconds to fill
+                per gap: for FORWARD_FILL this applies after a known value; for BACKWARD_FILL this applies before a
+                known value. Has no effect if fill_data_method is not provided. Must be a positive integer.
+            - inside_area_only (bool): Optional. Default True. Controls whether filling is restricted to internal gaps
+                between original values (True) or may extend across edges (False). Has effect only when
+                fill_data_method is provided.
 
         Returns:
             A dict of parameters ready to be passed into the Communicator requests.
@@ -459,57 +469,113 @@ class BasePadSite(BaseInterface):
             'session_key': session_key,
         }
 
-    def get_realtime_measurements_data(self, session_key: str = None) -> Tuple[Data, str]:
+    def get_realtime_measurements_data(
+            self,
+            session_key: str = None,
+            restart_on_error: bool = True,
+            restart_on_close: bool = True,
+    ) -> Tuple[Data, str]:
         """Open a WebSocket stream of real-time measurements (sync).
 
         Parameters:
             session_key: Optional session identifier to resume/associate a stream.
+            restart_on_error: If True, the returned Data instance will automatically attempt to reconnect
+            to the server if an error occurs.
+            restart_on_close: If True, the Data instance will also recreate the underlying generator when
+            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
 
         Returns:
             A tuple of (Data, session_key) where Data lazily yields messages and session_key is the key in use.
         """
         params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
         data_generator_factory = lambda: Communicator.websocket_generator(**params)
-        return Data(data_generator_factory), params['session_key']
+        return Data(
+            data_generator_factory,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+        ), params['session_key']
 
-    async def aget_realtime_measurements_data(self, session_key: str = None) -> Tuple[DataAsync, str]:
+    async def aget_realtime_measurements_data(
+            self,
+            session_key: str = None,
+            restart_on_error: bool = True,
+            restart_on_close: bool = True,
+    ) -> Tuple[DataAsync, str]:
         """Open a WebSocket stream of real-time measurements (async).
 
         Parameters:
             session_key: Optional session identifier to resume/associate a stream.
+            restart_on_error: If True, the returned DataAsync instance will automatically attempt to reconnect
+            to the server if an error occurs.
+            restart_on_close: If True, the DataAsync instance will also recreate the underlying async generator when
+            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
 
         Returns:
             A tuple of (DataAsync, session_key) where DataAsync lazily yields messages on async iteration.
         """
         params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
         data_generator_factory = lambda: Communicator.websocket_generator_async(**params)
-        return DataAsync(data_generator_factory), params['session_key']
+        return DataAsync(
+            data_generator_factory,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+        ), params['session_key']
 
-    def _get_real_time_updates_object(self, endpoint_url: str) -> Data:
+    def _get_real_time_updates_object(
+            self,
+            endpoint_url: str,
+            restart_on_error: bool = True,
+            restart_on_close: bool = True,
+    ) -> Data:
         """Helper to build a Data object for a generic real-time WebSocket endpoint (sync)."""
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
         data_generator_factory = lambda: Communicator.websocket_generator(url, auth_token=auth_token)
-        return Data(data_generator_factory)
+        return Data(data_generator_factory, restart_on_error=restart_on_error, restart_on_close=restart_on_close)
 
-    async def _aget_real_time_updates_object(self, endpoint_url: str) -> DataAsync:
+    async def _aget_real_time_updates_object(
+            self,
+            endpoint_url: str,
+            restart_on_error: bool = True,
+            restart_on_close: bool = True,
+    ) -> DataAsync:
         """Helper to build a DataAsync for a generic real-time WebSocket endpoint (async)."""
         auth_token = self._select_token(self._auth_token)
         url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
         data_generator_factory = lambda: Communicator.websocket_generator_async(url, auth_token=auth_token)
-        return DataAsync(data_generator_factory)
+        return DataAsync(data_generator_factory, restart_on_error=restart_on_error, restart_on_close=restart_on_close)
 
-    def get_realtime_instance_updates(self) -> Data:
-        """Get a Data stream of real-time instance (Pad/Site) updates over WebSocket (sync)."""
-        return self._get_real_time_updates_object(self._api_url_instance_updates_websocket)
+    def get_realtime_instance_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:
+        """Get a Data stream of real-time instance (Pad/Site) updates over WebSocket (sync).
+        See the documentation in the overridden methods for more information. """
+        return self._get_real_time_updates_object(
+            self._api_url_instance_updates_websocket,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+        )
 
-    async def aget_realtime_instance_updates(self) -> DataAsync:
-        """Get a DataAsync stream of real-time instance (Pad/Site) updates over WebSocket (async)."""
-        return await self._aget_real_time_updates_object(self._api_url_instance_updates_websocket)
+    async def aget_realtime_instance_updates(
+            self,
+            restart_on_error: bool = True,
+            restart_on_close: bool = True
+    ) -> DataAsync:
+        """Get a DataAsync stream of real-time instance (Pad/Site) updates over WebSocket (async).
+        See the documentation in the overridden methods for more information. """
+        return await self._aget_real_time_updates_object(
+            self._api_url_instance_updates_websocket,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+        )
 
-    def get_realtime_data_changes_updates(self) -> Data:
+    def get_realtime_data_changes_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:
         """Create a Data object that provides a lazy WebSocket stream of real-time data-change
         events for this Pad/Site.
+
+        Parameters:
+            restart_on_error: If True, the returned Data instance will automatically attempt to reconnect
+            to the server if an error occurs.
+            restart_on_close: If True, the Data instance will also recreate the underlying generator when
+            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
 
         data.data_fetcher is a lazy synchronous generator. Each iteration blocks until the next
         update message is received. You can also persist the stream to a file via
@@ -541,11 +607,25 @@ class BasePadSite(BaseInterface):
         Returns:
             Data: A Data object whose data_fetcher yields update messages one by one.
         """
-        return self._get_real_time_updates_object(self._api_url_changelog_updates_websocket)
+        return self._get_real_time_updates_object(
+            self._api_url_changelog_updates_websocket,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+        )
 
-    async def aget_realtime_data_changes_updates(self) -> DataAsync:
+    async def aget_realtime_data_changes_updates(
+            self,
+            restart_on_error: bool = True,
+            restart_on_close: bool = True,
+    ) -> DataAsync:
         """Create a DataAsync object that provides a lazy WebSocket stream of real-time
         data-change events for this Pad/Site.
+
+        Parameters:
+            restart_on_error: If True, the returned DataAsync instance will automatically attempt to reconnect
+            to the server if an error occurs.
+            restart_on_close: If True, the DataAsync wrapper will also recreate the underlying async generator when
+            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
 
         data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next
         update message. You can also persist the stream to a file via
@@ -578,4 +658,8 @@ class BasePadSite(BaseInterface):
             DataAsync: A DataAsync object whose data_fetcher yields update messages one by one when
             asynchronously iterated over.
         """
-        return await self._aget_real_time_updates_object(self._api_url_changelog_updates_websocket)
+        return await self._aget_real_time_updates_object(
+            self._api_url_changelog_updates_websocket,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+        )

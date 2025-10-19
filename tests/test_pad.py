@@ -503,7 +503,7 @@ def test_pad_get_realtime_updates(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'websocket_generator', fake_ws)
 
-    data_obj = pad.get_realtime_instance_updates()
+    data_obj = pad.get_realtime_instance_updates(restart_on_close=False)
     out = list(data_obj.data_fetcher)
     assert out == messages
 
@@ -527,7 +527,7 @@ async def test_pad_aget_realtime_updates(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'websocket_generator_async', fake_ws_async)
 
-    data_async = await pad.aget_realtime_instance_updates()
+    data_async = await pad.aget_realtime_instance_updates(restart_on_close=False)
     collected = []
     async for item in data_async.data_fetcher:
         collected.append(item)
