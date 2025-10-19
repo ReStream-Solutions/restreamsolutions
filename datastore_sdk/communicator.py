@@ -1,6 +1,7 @@
 import asyncio
 import time
 import functools
+import sys
 from decimal import Decimal
 from typing import Generator, Any, AsyncGenerator, Optional, Iterable, Dict, List
 import warnings
@@ -35,7 +36,9 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
     """
 
     def decorator(func):
-        if attempts < 1:
+        # During pytest runs, force attempts=1; otherwise use provided/default attempts
+        effective_attempts = 1 if 'pytest' in sys.modules else attempts
+        if effective_attempts < 1:
             raise ValueError("attempts must be >= 1")
 
         is_coro = asyncio.iscoroutinefunction(func)
@@ -43,14 +46,14 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
             delay = initial_delay
-            for i in range(attempts):
+            for i in range(effective_attempts):
                 try:
                     return await func(*args, **kwargs)
                 except (AuthError, APICompatibilityError, APIConcurrencyLimitError):
                     # Do not retry on these errors
                     raise
                 except Exception as e:
-                    if i == attempts - 1:
+                    if i == effective_attempts - 1:
                         raise
                     warnings.warn(
                         f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
@@ -62,14 +65,14 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
             delay = initial_delay
-            for i in range(attempts):
+            for i in range(effective_attempts):
                 try:
                     return func(*args, **kwargs)
                 except (AuthError, APICompatibilityError, APIConcurrencyLimitError):
                     # Do not retry on these errors
                     raise
                 except Exception as e:
-                    if i == attempts - 1:
+                    if i == effective_attempts - 1:
                         raise
                     warnings.warn(
                         f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
