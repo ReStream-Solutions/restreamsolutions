@@ -371,7 +371,11 @@ class Communicator:
                     data = json.loads(data)
                 if get_nested_key is not None:
                     data = data[get_nested_key]
-                yield data
+                if isinstance(data, list):
+                    for item in data:
+                        yield item
+                else:
+                    yield data
                 if ack_message:
                     ws.send(json.dumps(ack_message))
 
@@ -428,7 +432,11 @@ class Communicator:
                             if get_nested_key is not None:
                                 # Only attempt to parse JSON and extract when a nested key is requested
                                 data = data[get_nested_key]
-                            yield data
+                            if isinstance(data, list):
+                                for item in data:
+                                    yield item
+                            else:
+                                yield data
                             if ack_message:
                                 await ws.send_json(ack_message)
                         elif msg.type == aiohttp.WSMsgType.BINARY:
