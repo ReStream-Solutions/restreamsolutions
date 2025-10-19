@@ -28,6 +28,7 @@ class BasePadSite(BaseInterface):
     - _api_url_data_changes_single
     - _api_url_data_changes_multiple
     """
+
     _api_url_fields_metadata: str = None
     _api_url_stages_metadata: str = None
     _api_url_aggregations_metadata: str = None
@@ -38,12 +39,14 @@ class BasePadSite(BaseInterface):
     _api_url_instance_updates_websocket: str = None
     _api_url_changelog_updates_websocket: str = None
 
-    def _mix_stage_metadata_filters(self,
-            start: datetime = None,
-            end: datetime = None,
-            stage_number: int = None,
-            stage_name_filter: StageNameFilters = None,
-            **filters) -> dict[str, int | str]:
+    def _mix_stage_metadata_filters(
+        self,
+        start: datetime = None,
+        end: datetime = None,
+        stage_number: int = None,
+        stage_name_filter: StageNameFilters = None,
+        **filters,
+    ) -> dict[str, int | str]:
         """Compose query params for stages metadata endpoints.
 
         Parameters:
@@ -97,13 +100,14 @@ class BasePadSite(BaseInterface):
         return await Communicator.send_get_request_async(url, auth_token, **filters)
 
     def get_stages_metadata(
-            self,
-            start: datetime = None,
-            end: datetime = None,
-            stage_number: int = None,
-            stage_name_filter: StageNameFilters = None,
-            add_aggregations: bool = False,
-            **filters) -> list[dict[str, Any]]:
+        self,
+        start: datetime = None,
+        end: datetime = None,
+        stage_number: int = None,
+        stage_name_filter: StageNameFilters = None,
+        add_aggregations: bool = False,
+        **filters,
+    ) -> list[dict[str, Any]]:
         """Fetch historic stages metadata for this entity (pad/site). Optionally adds aggregated metrics to the metadata.
 
         Parameters:
@@ -129,13 +133,14 @@ class BasePadSite(BaseInterface):
         return stages_metadata
 
     async def aget_stages_metadata(
-            self,
-            start: datetime = None,
-            end: datetime = None,
-            stage_number: int = None,
-            stage_name_filter: StageNameFilters = None,
-            add_aggregations: bool = False,
-            **filters) -> list[dict[str, Any]]:
+        self,
+        start: datetime = None,
+        end: datetime = None,
+        stage_number: int = None,
+        stage_name_filter: StageNameFilters = None,
+        add_aggregations: bool = False,
+        **filters,
+    ) -> list[dict[str, Any]]:
         """Asynchronously fetch historic stages metadata for this entity (pad/site).
         Optionally adds aggregated metrics to the metadata.
 
@@ -163,8 +168,8 @@ class BasePadSite(BaseInterface):
 
     @staticmethod
     def _merge_aggregations_with_stages(
-            stages_metadata: list[dict[str, Any]],
-            aggregations_metadata: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+        stages_metadata: list[dict[str, Any]], aggregations_metadata: dict[str, list[dict[str, Any]]]
+    ) -> list[dict[str, Any]]:
         """Attach aggregation metadata to corresponding stage items by its id.
 
         Parameters:
@@ -211,7 +216,9 @@ class BasePadSite(BaseInterface):
         stages_metadata = self._merge_aggregations_with_stages(stages_metadata, aggregations)
         return stages_metadata
 
-    async def _add_aggregations_async(self, stages_metadata: list[dict[str, Any]], auth_token: str) -> list[dict[str, Any]]:
+    async def _add_aggregations_async(
+        self, stages_metadata: list[dict[str, Any]], auth_token: str
+    ) -> list[dict[str, Any]]:
         """Asynchronously fetch and attach aggregations to the provided historic stages list.
 
         Parameters:
@@ -228,7 +235,6 @@ class BasePadSite(BaseInterface):
         aggregations = await Communicator.send_get_request_async(url, auth_token, histories=stages_ids)
         stages_metadata = self._merge_aggregations_with_stages(stages_metadata, aggregations)
         return stages_metadata
-
 
     def get_measurement_sources_metadata(self) -> dict:
         """Fetch metadata about measurement sources for this entity.
@@ -388,11 +394,11 @@ class BasePadSite(BaseInterface):
     def get_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[list[dict | DataChanges], Data]:
         """Fetch all data change events for the current object (Site or Pad) and a Data object
         that allows to stream the affected data or save it to a file.
-        
+
         Parameters:
             as_dict: If True, each change is returned as a dict; otherwise as DataChanges objects.
             **filters: Optional filters accepted by the change log endpoint.
-        
+
         Returns:
             A tuple of (changes_list, combined_data) where:
               - changes_list is a list of dicts or DataChanges instances depending on as_dict.
@@ -412,14 +418,16 @@ class BasePadSite(BaseInterface):
         combined_data = DataChanges._build_combined_data_object(raw_changes, auth_token)
         return changes_list, combined_data
 
-    async def aget_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[list[dict | DataChanges], DataAsync]:
+    async def aget_data_changes(
+        self, as_dict: bool = False, **filters: dict
+    ) -> tuple[list[dict | DataChanges], DataAsync]:
         """Asynchronously fetch all data change events for the current object (Site or Pad), along with
         a DataAsync object that allows you to stream the affected data or save it to a file.
-        
+
         Parameters:
             as_dict: If True, each change is returned as a dict; otherwise as DataChanges objects.
             **filters: Optional filters accepted by the change log endpoint.
-        
+
         Returns:
             A tuple of (changes_list, combined_data) where:
               - changes_list is a list of dicts or DataChanges instances depending on as_dict.
@@ -470,10 +478,10 @@ class BasePadSite(BaseInterface):
         }
 
     def get_realtime_measurements_data(
-            self,
-            session_key: str = None,
-            restart_on_error: bool = True,
-            restart_on_close: bool = True,
+        self,
+        session_key: str = None,
+        restart_on_error: bool = True,
+        restart_on_close: bool = True,
     ) -> Tuple[Data, str]:
         """Open a WebSocket stream of real-time measurements (sync).
 
@@ -489,17 +497,20 @@ class BasePadSite(BaseInterface):
         """
         params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
         data_generator_factory = lambda: Communicator.websocket_generator(**params)
-        return Data(
-            data_generator_factory,
-            restart_on_error=restart_on_error,
-            restart_on_close=restart_on_close,
-        ), params['session_key']
+        return (
+            Data(
+                data_generator_factory,
+                restart_on_error=restart_on_error,
+                restart_on_close=restart_on_close,
+            ),
+            params['session_key'],
+        )
 
     async def aget_realtime_measurements_data(
-            self,
-            session_key: str = None,
-            restart_on_error: bool = True,
-            restart_on_close: bool = True,
+        self,
+        session_key: str = None,
+        restart_on_error: bool = True,
+        restart_on_close: bool = True,
     ) -> Tuple[DataAsync, str]:
         """Open a WebSocket stream of real-time measurements (async).
 
@@ -515,17 +526,20 @@ class BasePadSite(BaseInterface):
         """
         params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
         data_generator_factory = lambda: Communicator.websocket_generator_async(**params)
-        return DataAsync(
-            data_generator_factory,
-            restart_on_error=restart_on_error,
-            restart_on_close=restart_on_close,
-        ), params['session_key']
+        return (
+            DataAsync(
+                data_generator_factory,
+                restart_on_error=restart_on_error,
+                restart_on_close=restart_on_close,
+            ),
+            params['session_key'],
+        )
 
     def _get_real_time_updates_object(
-            self,
-            endpoint_url: str,
-            restart_on_error: bool = True,
-            restart_on_close: bool = True,
+        self,
+        endpoint_url: str,
+        restart_on_error: bool = True,
+        restart_on_close: bool = True,
     ) -> Data:
         """Helper to build a Data object for a generic real-time WebSocket endpoint (sync)."""
         auth_token = self._select_token(self._auth_token)
@@ -534,10 +548,10 @@ class BasePadSite(BaseInterface):
         return Data(data_generator_factory, restart_on_error=restart_on_error, restart_on_close=restart_on_close)
 
     async def _aget_real_time_updates_object(
-            self,
-            endpoint_url: str,
-            restart_on_error: bool = True,
-            restart_on_close: bool = True,
+        self,
+        endpoint_url: str,
+        restart_on_error: bool = True,
+        restart_on_close: bool = True,
     ) -> DataAsync:
         """Helper to build a DataAsync for a generic real-time WebSocket endpoint (async)."""
         auth_token = self._select_token(self._auth_token)
@@ -547,7 +561,7 @@ class BasePadSite(BaseInterface):
 
     def get_realtime_instance_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:
         """Get a Data stream of real-time instance (Pad/Site) updates over WebSocket (sync).
-        See the documentation in the overridden methods for more information. """
+        See the documentation in the overridden methods for more information."""
         return self._get_real_time_updates_object(
             self._api_url_instance_updates_websocket,
             restart_on_error=restart_on_error,
@@ -555,12 +569,10 @@ class BasePadSite(BaseInterface):
         )
 
     async def aget_realtime_instance_updates(
-            self,
-            restart_on_error: bool = True,
-            restart_on_close: bool = True
+        self, restart_on_error: bool = True, restart_on_close: bool = True
     ) -> DataAsync:
         """Get a DataAsync stream of real-time instance (Pad/Site) updates over WebSocket (async).
-        See the documentation in the overridden methods for more information. """
+        See the documentation in the overridden methods for more information."""
         return await self._aget_real_time_updates_object(
             self._api_url_instance_updates_websocket,
             restart_on_error=restart_on_error,
@@ -614,9 +626,9 @@ class BasePadSite(BaseInterface):
         )
 
     async def aget_realtime_data_changes_updates(
-            self,
-            restart_on_error: bool = True,
-            restart_on_close: bool = True,
+        self,
+        restart_on_error: bool = True,
+        restart_on_close: bool = True,
     ) -> DataAsync:
         """Create a DataAsync object that provides a lazy WebSocket stream of real-time
         data-change events for this Pad/Site.

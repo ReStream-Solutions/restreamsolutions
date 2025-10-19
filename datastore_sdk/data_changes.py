@@ -25,6 +25,7 @@ class DataChanges(BaseInterface):
     appear in API responses, and update_received for the instance will be set to
     True.
     """
+
     _api_url_single_object: str = ENDPOINTS.data_changes_site_one.value
     _api_url_multiple_objects: str = ENDPOINTS.data_changes_site_many.value
 
@@ -111,7 +112,9 @@ class DataChanges(BaseInterface):
             APICompatibilityError: If the response structure is incompatible
             with the expected schema.
         """
-        if (not isinstance(response_data, dict) or 'change_log' not in response_data
+        if (
+            not isinstance(response_data, dict)
+            or 'change_log' not in response_data
             or not isinstance(response_data['change_log'], list)
         ):
             raise APICompatibilityError(
@@ -166,6 +169,7 @@ class DataChanges(BaseInterface):
             [start_date, end_date] interval for this instance's site.
         """
         from .site import Site
+
         site = Site(self.site)
         return site.get_data(start_datetime=self.start_date, end_datetime=self.end_date)
 
@@ -183,6 +187,7 @@ class DataChanges(BaseInterface):
             specified [start_date, end_date] interval for this instance's site.
         """
         from .site import Site
+
         site = Site(self.site)
         return await site.aget_data(start_datetime=self.start_date, end_datetime=self.end_date)
 
@@ -193,14 +198,7 @@ class DataChanges(BaseInterface):
             dict: Payload with change_log entry marking update_received=True for
             this instance's id.
         """
-        return {
-            "change_log": [
-                {
-                    "id": self.id,
-                    "update_received": True
-                }
-            ]
-        }
+        return {"change_log": [{"id": self.id, "update_received": True}]}
 
     def confirm_data_received(self) -> bool:
         """Confirm to the API that this change event was processed.
@@ -243,7 +241,9 @@ class DataChanges(BaseInterface):
         return self.update_received
 
     @staticmethod
-    def _group_and_merge_intervals_by_site(raw_changes: list[dict[str, Any]]) -> dict[int, list[tuple[datetime, datetime]]]:
+    def _group_and_merge_intervals_by_site(
+        raw_changes: list[dict[str, Any]],
+    ) -> dict[int, list[tuple[datetime, datetime]]]:
         """Group change events entries by site and merge overlapping start_date - end_date intervals.
         This helps to avoid duplicated data retrieval.
 
@@ -303,6 +303,7 @@ class DataChanges(BaseInterface):
 
         def data_generator_factory():
             from .site import Site
+
             for site_id in sorted(intervals_by_site.keys()):
                 site = Site(id=site_id, auth_token=auth_token)
                 for start_dt, end_dt in intervals_by_site[site_id]:
@@ -330,6 +331,7 @@ class DataChanges(BaseInterface):
 
         async def data_generator_factory():
             from .site import Site
+
             for site_id in sorted(intervals_by_site.keys()):
                 site = Site(id=site_id, auth_token=auth_token)
                 for start_dt, end_dt in intervals_by_site[site_id]:

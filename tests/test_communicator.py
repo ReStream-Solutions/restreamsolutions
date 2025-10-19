@@ -15,6 +15,7 @@ from datastore_sdk.exceptions import AuthError, APICompatibilityError, APIConcur
 # Helpers
 # ------------------------
 
+
 def make_requests_response(status: int, payload):
     resp = requests.Response()
     resp.status_code = status
@@ -32,6 +33,7 @@ def make_httpx_response(status: int, payload):
 
 def fake_get_factory(response, expected_url=None, expected_params=None, expected_headers=None):
     """Factory for a requests.get stub with optional assertions."""
+
     def _fake_get(u, params=None, headers=None, **kwargs):
         if expected_url is not None:
             assert u == expected_url
@@ -40,11 +42,13 @@ def fake_get_factory(response, expected_url=None, expected_params=None, expected
         if expected_headers is not None:
             assert headers == expected_headers
         return response
+
     return _fake_get
 
 
 def fake_post_factory(response, expected_url=None, expected_params=None, expected_headers=None, expected_json=None):
     """Factory for a requests.post stub with optional assertions."""
+
     def _fake_post(u, params=None, headers=None, json=None, **kwargs):
         if expected_url is not None:
             assert u == expected_url
@@ -55,26 +59,33 @@ def fake_post_factory(response, expected_url=None, expected_params=None, expecte
         if expected_json is not None:
             assert json == expected_json
         return response
+
     return _fake_post
 
 
 class DummyAsyncClient:
     """Reusable dummy for httpx.AsyncClient with injectable callbacks."""
+
     def __init__(self, get_cb=None, post_cb=None, *args, **kwargs):
         self._get_cb = get_cb
         self._post_cb = post_cb
+
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, exc_type, exc, tb):
         return False
+
     async def get(self, u, params=None, headers=None):
         if self._get_cb is None:
             raise RuntimeError("No get_cb provided for DummyAsyncClient")
         return await self._maybe_await(self._get_cb(u=u, params=params, headers=headers))
+
     async def post(self, u, params=None, headers=None, json=None):
         if self._post_cb is None:
             raise RuntimeError("No post_cb provided for DummyAsyncClient")
         return await self._maybe_await(self._post_cb(u=u, params=params, headers=headers, json=json))
+
     @staticmethod
     async def _maybe_await(val):
         if isinstance(val, types.CoroutineType) or hasattr(val, "__await__"):
@@ -84,22 +95,27 @@ class DummyAsyncClient:
 
 class DummyRaw:
     """Mimics the .raw attribute of a requests Response for streaming."""
+
     def __init__(self):
         self.decode_content = False
 
 
 class DummyCtx:
     """Synchronous context manager that yields a given value."""
+
     def __init__(self, yield_value):
         self._yield_value = yield_value
+
     def __enter__(self):
         return self._yield_value
+
     def __exit__(self, exc_type, exc, tb):
         return False
 
 
 class DummyStream:
     """Simple object with a .content attribute for aiohttp streaming tests."""
+
     def __init__(self, content=None):
         self.content = content if content is not None else object()
 
@@ -109,23 +125,30 @@ class DummySession:
 
     Provides a .get(...) method returning an async context manager that yields a DummyStream.
     """
+
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, exc_type, exc, tb):
         return False
+
     def get(self, *args, **kwargs):
         stream = DummyStream()
+
         class _Ctx:
             async def __aenter__(self_inner):
                 return stream
+
             async def __aexit__(self_inner, exc_type, exc, tb):
                 return False
+
         return _Ctx()
 
 
 # ------------------------
 # Sync GET
 # ------------------------
+
 
 def test_send_get_request_success(monkeypatch):
     url = "https://example.com/items"
@@ -192,6 +215,7 @@ def test_send_get_request_other_error(monkeypatch):
 # Sync POST
 # ------------------------
 
+
 def test_send_post_request_success(monkeypatch):
     url = "https://example.com/create"
     token = "abc"
@@ -221,8 +245,10 @@ def test_send_post_request_error_mapping(monkeypatch):
     ]
 
     for status, exc in cases:
+
         def fake_post(u, params=None, headers=None, json=None, _status=status):
             return make_requests_response(_status, {})
+
         monkeypatch.setattr(requests, "post", fake_post, raising=True)
         with pytest.raises(exc):
             Communicator.send_post_request("https://e", "tok", {})
@@ -261,6 +287,7 @@ async def test_send_get_request_async_error_mapping(monkeypatch):
     async def run_status(status, expected_exc):
         async def get_cb(u, params=None, headers=None):
             return make_httpx_response(status, {})
+
         monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(get_cb=get_cb))
         if expected_exc is None:
             with pytest.raises(httpx.HTTPStatusError):
@@ -269,7 +296,13 @@ async def test_send_get_request_async_error_mapping(monkeypatch):
             with pytest.raises(expected_exc):
                 await Communicator.send_get_request_async("https://e", "t")
 
-    for status, exc in [(401, AuthError), (403, AuthError), (404, APICompatibilityError), (429, APIConcurrencyLimitError), (500, None)]:
+    for status, exc in [
+        (401, AuthError),
+        (403, AuthError),
+        (404, APICompatibilityError),
+        (429, APIConcurrencyLimitError),
+        (500, None),
+    ]:
         await run_status(status, exc)
 
 
@@ -292,6 +325,7 @@ async def test_send_post_request_async_error_mapping(monkeypatch):
     async def run_status(status, expected_exc):
         async def post_cb(u, params=None, headers=None, json=None):
             return make_httpx_response(status, {})
+
         monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(post_cb=post_cb))
         if expected_exc is None:
             with pytest.raises(httpx.HTTPStatusError):
@@ -300,13 +334,20 @@ async def test_send_post_request_async_error_mapping(monkeypatch):
             with pytest.raises(expected_exc):
                 await Communicator.send_post_request_async("https://e", "t", {})
 
-    for status, exc in [(401, AuthError), (403, AuthError), (404, APICompatibilityError), (429, APIConcurrencyLimitError), (500, None)]:
+    for status, exc in [
+        (401, AuthError),
+        (403, AuthError),
+        (404, APICompatibilityError),
+        (429, APIConcurrencyLimitError),
+        (500, None),
+    ]:
         await run_status(status, exc)
 
 
 # ------------------------
 # Streaming (sync)
 # ------------------------
+
 
 def test_steaming_get_generator_yields_converted_items(monkeypatch):
     # Prepare a fake streaming Response that passes isinstance(Response)
@@ -345,8 +386,10 @@ def test_steaming_get_generator_error_mapping(monkeypatch):
     # Use various statuses to ensure mapping
     def run_status(status, expected_exc):
         stream_resp = make_requests_response(status, [])
+
         def fake_get(u, params=None, headers=None, stream=None, timeout=None):
             return DummyCtx(stream_resp)
+
         monkeypatch.setattr(requests, "get", fake_get)
         if expected_exc is None:
             with pytest.raises(requests.HTTPError):
@@ -355,7 +398,13 @@ def test_steaming_get_generator_error_mapping(monkeypatch):
             with pytest.raises(expected_exc):
                 list(Communicator.steaming_get_generator("https://e", "t"))
 
-    for status, exc in [(401, AuthError), (403, AuthError), (404, APICompatibilityError), (429, APIConcurrencyLimitError), (500, None)]:
+    for status, exc in [
+        (401, AuthError),
+        (403, AuthError),
+        (404, APICompatibilityError),
+        (429, APIConcurrencyLimitError),
+        (500, None),
+    ]:
         run_status(status, exc)
 
 
@@ -369,6 +418,7 @@ async def test_steaming_get_generator_async_yields_converted_items(monkeypatch):
 
     # Fake session.get async context manager returning an object with .content
     import aiohttp as _aiohttp
+
     monkeypatch.setattr(_aiohttp, "ClientSession", lambda timeout=None: DummySession())
 
     # Patch ijson.items to return an async iterator
@@ -399,24 +449,29 @@ async def test_steaming_get_generator_async_error_mapping(monkeypatch):
             if isinstance(exc, type) and issubclass(exc, Exception):
                 raise exc()
             # Otherwise raise HTTPStatus-like error by mimicking raise_for_status behavior
+
         return _check
 
     for exc in [AuthError, APICompatibilityError, APIConcurrencyLimitError]:
         monkeypatch.setattr(Communicator, "_check_response_status_code", make_check(exc))
 
         import aiohttp as _aiohttp
+
         monkeypatch.setattr(_aiohttp, "ClientSession", lambda timeout=None: DummySession())
 
         with pytest.raises(exc):
             async for _ in Communicator.steaming_get_generator_async("https://e", "t"):
                 pass
 
+
 # ------------------------
 # WebSocket tests
 # ------------------------
 
+
 def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
     import datastore_sdk.communicator as comm_module
+
     sent = []
     closed = {"flag": False}
     captured = {}
@@ -425,13 +480,17 @@ def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
     class DummyWS:
         def __init__(self, skip_utf8_validation=True):
             assert skip_utf8_validation is True
+
         def connect(self, url, header=None):
             captured["url"] = url
             captured["header"] = header
+
         def recv(self):
             return recv_queue.pop(0)
+
         def send(self, data):
             sent.append(data)
+
         def close(self):
             closed["flag"] = True
 
@@ -448,7 +507,7 @@ def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
     out = list(gen)
 
     # Yields raw messages and sends ACK for each
-    assert out ==[{"k1": 'v1'}, {'k2': 2}]
+    assert out == [{"k1": 'v1'}, {'k2': 2}]
     assert sent == [json.dumps({"ack": True}), json.dumps({"ack": True})]
 
     # Connection closed in finally
@@ -471,13 +530,17 @@ def test_websocket_generator_stops_on_connection_closed(monkeypatch):
     class DummyWSClosed:
         def __init__(self, *args, **kwargs):
             pass
+
         def connect(self, url, header=None):
             pass
+
         def recv(self):
             # Simulate server closing the connection
             raise comm_module.WebSocketConnectionClosedException()
+
         def send(self, data):
             pass
+
         def close(self):
             DummyWSClosed.closed = True
 
@@ -510,22 +573,27 @@ def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
         def __init__(self, seq, on_send_json):
             self._iter = iter(seq)
             self._on_send_json = on_send_json
+
         async def receive(self):
             try:
                 return next(self._iter)
             except StopIteration:
                 # After CLOSE, context manager will exit
                 return types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSED, data=None)
+
         async def send_json(self, payload):
             self._on_send_json(payload)
 
     class DummySession:
         def __init__(self, *args, **kwargs):
             self.captured = {}
+
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, exc_type, exc, tb):
             return False
+
         def ws_connect(self, url, headers=None, params=None):
             self.captured["url"] = url
             self.captured["headers"] = headers
@@ -537,20 +605,25 @@ def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
                 types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSE, data=None),
             ]
             ws = DummyWS(seq, on_send_json=lambda p: self.captured.setdefault("acks", []).append(p))
+
             class _Ctx:
                 async def __aenter__(self_inner):
                     return ws
+
                 async def __aexit__(self_inner, exc_type, exc, tb):
                     return False
+
             return _Ctx()
 
     # Capture the created session instance for later inspection
     holder = {}
     orig_cls = DummySession
+
     def _factory(*args, **kwargs):
         inst = orig_cls(*args, **kwargs)
         holder["session"] = inst
         return inst
+
     monkeypatch.setattr(comm_module.aiohttp, "ClientSession", _factory)
 
     gen = comm_module.Communicator.websocket_generator_async(
@@ -584,6 +657,7 @@ def test_websocket_generator_async_error_raises(monkeypatch):
     class DummyWS:
         def __init__(self, seq):
             self._iter = iter(seq)
+
         async def receive(self):
             try:
                 return next(self._iter)
@@ -593,18 +667,24 @@ def test_websocket_generator_async_error_raises(monkeypatch):
     class DummyWebsocketSession:
         def __init__(self, *args, **kwargs):
             pass
+
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, exc_type, exc, tb):
             return False
+
         def ws_connect(self, url, headers=None, params=None):
             seq = [types.SimpleNamespace(type=aiohttp.WSMsgType.ERROR, data=None)]
             ws = DummyWS(seq)
+
             class _Ctx:
                 async def __aenter__(self_inner):
                     return ws
+
                 async def __aexit__(self_inner, exc_type, exc, tb):
                     return False
+
             return _Ctx()
 
     monkeypatch.setattr(comm_module.aiohttp, "ClientSession", DummyWebsocketSession)

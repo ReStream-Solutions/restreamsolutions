@@ -5,6 +5,7 @@ from enum import Enum
 # Base URL for the Restream Solutions external API
 RESTREAM_HOST = 'https://app.restreamsolutions.com'
 
+
 class ENDPOINTS(Enum):
     """REST API endpoint path templates.
 
@@ -40,12 +41,14 @@ class ENDPOINTS(Enum):
     site_changelog_updates_websocket = '/external/thirdparty/v2/ws/sites/{id}/data_changes/'
     pad_changelog_updates_websocket = '/external/thirdparty/v2/ws/pads/{id}/data_changes/'
 
+
 class StageNameFilters(Enum):
     """Short codes used to filter stage history by operation type."""
 
-    FRAC = 'frac'       # Frac operations
-    WIRELINE = 'wl'     # Wireline operations
-    STANDBY = 'standby' # Non-operational/standby periods
+    FRAC = 'frac'  # Frac operations
+    WIRELINE = 'wl'  # Wireline operations
+    STANDBY = 'standby'  # Non-operational/standby periods
+
 
 class DataResolutions(Enum):
     """Allowed sampling resolutions for time-series data requests."""
@@ -56,12 +59,14 @@ class DataResolutions(Enum):
     TEN_MINUTE = 'ten-minute'
     HOUR = 'hour'
 
+
 class DataAggregations(Enum):
     """Aggregation functions supported by the API when querying time-series data."""
 
     MIN = 'min'
     MAX = 'max'
     MEAN = 'mean'
+
 
 class DataFillMethods(Enum):
     BACKWARD_FILL = 'bfill'

@@ -44,7 +44,7 @@ class BaseInterface:
             The fully formatted absolute URL as a string.
         """
         base_url = os.environ.get('RESTREAM_HOST', RESTREAM_HOST)
-        api_url =  f'{base_url}{url}'.format(**params)
+        api_url = f'{base_url}{url}'.format(**params)
 
         if not is_websocket:
             return api_url

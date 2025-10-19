@@ -57,7 +57,7 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
                         raise
                     warnings.warn(
                         f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
-                        RuntimeWarning
+                        RuntimeWarning,
                     )
                     await asyncio.sleep(delay)
                     delay *= factor
@@ -76,7 +76,7 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
                         raise
                     warnings.warn(
                         f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
-                        RuntimeWarning
+                        RuntimeWarning,
                     )
                     time.sleep(delay)
                     delay *= factor
@@ -102,9 +102,9 @@ class Communicator:
 
     @staticmethod
     def _create_headers(
-            auth_token: str,
-            additional_headers: Optional[Iterable[Dict[str, str]]] = None,
-            as_list_of_strings: bool = False,
+        auth_token: str,
+        additional_headers: Optional[Iterable[Dict[str, str]]] = None,
+        as_list_of_strings: bool = False,
     ) -> Optional[Dict[str, str] | List[str]]:
         """Create request headers with optional Authorization and merge additional headers.
 
@@ -128,11 +128,13 @@ class Communicator:
 
     @staticmethod
     def _check_response_status_code(
-            response: httpx.Response |
-                      requests.Response |
-                      aiohttp.ClientResponse |
-                      WSServerHandshakeError |
-                      WebSocketBadStatusException
+        response: (
+            httpx.Response
+            | requests.Response
+            | aiohttp.ClientResponse
+            | WSServerHandshakeError
+            | WebSocketBadStatusException
+        ),
     ):
         """Validate HTTP response status and raise SDK-specific exceptions.
 
@@ -176,6 +178,7 @@ class Communicator:
         Returns:
             A new dictionary with values converted as described above.
         """
+
         def convert_value(value: Any) -> Any:
             if isinstance(value, Decimal):
                 return float(value)
@@ -185,7 +188,6 @@ class Communicator:
                 return value
 
         return {k: convert_value(v) for k, v in obj.items()}
-
 
     @staticmethod
     @exponential_backoff
@@ -232,7 +234,7 @@ class Communicator:
 
     @staticmethod
     @exponential_backoff
-    def send_post_request(url: str, auth_token: str, payload: dict,  **params) -> dict | list:
+    def send_post_request(url: str, auth_token: str, payload: dict, **params) -> dict | list:
         """Send a synchronous HTTP POST request with a JSON payload.
 
         Parameters:

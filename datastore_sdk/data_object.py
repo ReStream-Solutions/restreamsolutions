@@ -66,11 +66,10 @@ class Data(BaseData):
     data_fetcher: Generator[dict, None, None]
 
     def __init__(
-            self,
-            data_generator_factory: Callable[[],
-            Generator[dict, None, None]],
-            restart_on_error: bool = False,
-            restart_on_close: bool = False,
+        self,
+        data_generator_factory: Callable[[], Generator[dict, None, None]],
+        restart_on_error: bool = False,
+        restart_on_close: bool = False,
     ) -> None:
         """Initialize the Data wrapper.
 
@@ -102,6 +101,7 @@ class Data(BaseData):
         Returns:
             Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
         """
+
         def _wrapper():
             while True:
                 gen = self._data_generator_factory()
@@ -120,6 +120,7 @@ class Data(BaseData):
                     warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
                     time.sleep(1)
                     continue
+
         return _wrapper()
 
     def _save_json(self, path: Path) -> None:
@@ -159,7 +160,7 @@ class Data(BaseData):
         finally:
             temp_json_path.unlink(missing_ok=True)
 
-    def save(self, path: str, overwrite: bool=False):
+    def save(self, path: str, overwrite: bool = False):
         """Save all selected pad/site data to a JSON or CSV file.
 
         The method writes all selected pad/sites data either to a JSON file (as a single
@@ -200,11 +201,10 @@ class DataAsync(BaseData):
     data_fetcher: AsyncGenerator[dict, None]
 
     def __init__(
-            self,
-            data_generator_factory: Callable[[],
-            AsyncGenerator[dict, None]],
-            restart_on_error: bool = False,
-            restart_on_close: bool = False,
+        self,
+        data_generator_factory: Callable[[], AsyncGenerator[dict, None]],
+        restart_on_error: bool = False,
+        restart_on_close: bool = False,
     ) -> None:
         """Initialize the asynchronous Data wrapper.
 
@@ -235,6 +235,7 @@ class DataAsync(BaseData):
         Returns:
             Async Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
         """
+
         async def _wrapper():
             while True:
                 agen = self._data_generator_factory()
@@ -253,6 +254,7 @@ class DataAsync(BaseData):
                     warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
                     await asyncio.sleep(1)
                     continue
+
         return _wrapper()
 
     async def _asave_json(self, path: Path):

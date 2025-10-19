@@ -37,6 +37,7 @@ class State(BaseInterface):
       - last_state_confirmation_time (datetime): Timestamp of the most recent confirmation of the current state's validity.
       - previous_state (int): ID of the previous stage history object.
     """
+
     _api_url_single_object: str = ENDPOINTS.states_one.value
     _api_url_multiple_objects: str = ENDPOINTS.states_many.value
 
@@ -61,11 +62,7 @@ class State(BaseInterface):
 
     @classmethod
     def get_models(
-            cls,
-            stage_name_filter: StageNameFilters = None,
-            auth_token: str = None,
-            as_dict=False,
-            **filters
+        cls, stage_name_filter: StageNameFilters = None, auth_token: str = None, as_dict=False, **filters
     ) -> list['State'] | list[dict[str, Any]]:
         """Retrieve State models for a site or for a pad.
 
@@ -95,11 +92,7 @@ class State(BaseInterface):
 
     @classmethod
     async def aget_models(
-            cls,
-            stage_name_filter: StageNameFilters = None,
-            auth_token: str = None,
-            as_dict=False,
-            **filters
+        cls, stage_name_filter: StageNameFilters = None, auth_token: str = None, as_dict=False, **filters
     ) -> list['State'] | list[dict[str, Any]]:
         """Asynchronously retrieve State models for a site or for a pad.
 

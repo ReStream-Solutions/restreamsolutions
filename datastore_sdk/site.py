@@ -33,6 +33,7 @@ class Site(BasePadSite):
       - stage_total (int): Total number of stages for this site.
       - timezone (str): Timezone name for this site.
     """
+
     _api_url_single_object: str = ENDPOINTS.sites_one.value
     _api_url_multiple_objects: str = ENDPOINTS.sites_many.value
     _api_url_fields_metadata: str = ENDPOINTS.fields_site.value
@@ -78,6 +79,7 @@ class Site(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         from .state import State
+
         auth_token = self._auth_token if self._auth_token else None
         states = State.get_models(auth_token=auth_token, as_dict=as_dict, site__id=self.id)
         if not states:
@@ -102,6 +104,7 @@ class Site(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         from .state import State
+
         auth_token = self._auth_token if self._auth_token else None
         states = await State.aget_models(auth_token=auth_token, as_dict=as_dict, site__id=self.id)
         if not states:
@@ -125,6 +128,7 @@ class Site(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         from .pad import Pad
+
         if not hasattr(self, 'pad_id'):
             self.update()
         if getattr(self, 'pad_id') is None:
@@ -149,6 +153,7 @@ class Site(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         from .pad import Pad
+
         if not hasattr(self, 'pad_id'):
             await self.aupdate()
         if getattr(self, 'pad_id') is None:
@@ -226,19 +231,19 @@ class Site(BasePadSite):
         return self._extract_site_measurement_sources(pad_measurement_sources)
 
     def get_data(
-            self,
-            start_datetime: datetime = None,
-            end_datetime: datetime = None,
-            stage_number: int = None,
-            stage_name_filter: StageNameFilters = None,
-            resolution: DataResolutions = DataResolutions.SECOND,
-            aggregation: DataAggregations = None,
-            fields: str | list[str] = None,
-            si_units: bool = False,
-            measurement_sources_names: str | list[str] = None,
-            fill_data_method: DataFillMethods = None,
-            fill_data_limit: int | None = None,
-            inside_area_only: bool = True,
+        self,
+        start_datetime: datetime = None,
+        end_datetime: datetime = None,
+        stage_number: int = None,
+        stage_name_filter: StageNameFilters = None,
+        resolution: DataResolutions = DataResolutions.SECOND,
+        aggregation: DataAggregations = None,
+        fields: str | list[str] = None,
+        si_units: bool = False,
+        measurement_sources_names: str | list[str] = None,
+        fill_data_method: DataFillMethods = None,
+        fill_data_limit: int | None = None,
+        inside_area_only: bool = True,
     ) -> Data:
         """Stream time-series data for this site or save it to a file.
 
@@ -295,19 +300,19 @@ class Site(BasePadSite):
         )
 
     async def aget_data(
-            self,
-            start_datetime: datetime = None,
-            end_datetime: datetime = None,
-            stage_number: int = None,
-            stage_name_filter: StageNameFilters = None,
-            resolution: DataResolutions = DataResolutions.SECOND,
-            aggregation: DataAggregations = None,
-            fields: str | list[str] = None,
-            si_units: bool = False,
-            measurement_sources_names: str | list[str] = None,
-            fill_data_method: DataFillMethods = None,
-            fill_data_limit: int | None = None,
-            inside_area_only: bool = True,
+        self,
+        start_datetime: datetime = None,
+        end_datetime: datetime = None,
+        stage_number: int = None,
+        stage_name_filter: StageNameFilters = None,
+        resolution: DataResolutions = DataResolutions.SECOND,
+        aggregation: DataAggregations = None,
+        fields: str | list[str] = None,
+        si_units: bool = False,
+        measurement_sources_names: str | list[str] = None,
+        fill_data_method: DataFillMethods = None,
+        fill_data_limit: int | None = None,
+        inside_area_only: bool = True,
     ) -> DataAsync:
         """Asynchronously stream time-series data for this site or save it to a file.
 
@@ -405,11 +410,12 @@ class Site(BasePadSite):
         Returns:
             Data: A Data object whose data_fetcher yields update messages one by one.
         """
-        return super().get_realtime_instance_updates(restart_on_error=restart_on_error, restart_on_close=restart_on_close)
+        return super().get_realtime_instance_updates(
+            restart_on_error=restart_on_error, restart_on_close=restart_on_close
+        )
 
     async def aget_realtime_instance_updates(
-            self, restart_on_error: bool = True,
-            restart_on_close: bool = True
+        self, restart_on_error: bool = True, restart_on_close: bool = True
     ) -> DataAsync:
         """Creates a DataAsync class, containing a lazy WebSocket stream of real-time updates for this Site.
 
@@ -453,6 +459,5 @@ class Site(BasePadSite):
             iterated over.
         """
         return await super().aget_realtime_instance_updates(
-            restart_on_error=restart_on_error,
-            restart_on_close=restart_on_close
+            restart_on_error=restart_on_error, restart_on_close=restart_on_close
         )

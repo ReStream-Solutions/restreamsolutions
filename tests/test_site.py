@@ -30,9 +30,11 @@ def load_json(name: str):
     with open(BASE / name, 'r', encoding='utf-8') as f:
         return json.load(f)
 
+
 # ------------------------
 # Class-level methods (inherited from BaseInterface)
 # ------------------------
+
 
 def test_site_get_models(monkeypatch):
     token = 'tok'
@@ -126,6 +128,7 @@ async def test_site_aget_model(monkeypatch):
 # ------------------------
 # Instance-level: navigation to Pad and State
 # ------------------------
+
 
 def test_site_get_state(monkeypatch):
     token = 'tok'
@@ -236,6 +239,7 @@ async def test_site_aget_pad(monkeypatch):
 # Metadata endpoints (inherited from BasePadSite)
 # ------------------------
 
+
 def test_site_get_fields_metadata(monkeypatch):
     token = 'tok'
     site = Site(id=SITE_ID, auth_token=token)
@@ -329,6 +333,7 @@ async def test_site_aget_stages_metadata(monkeypatch):
 # Measurement sources (Site override)
 # ------------------------
 
+
 def test_site_get_measurement_sources_metadata(monkeypatch):
     token = 'tok'
     site = Site(id=SITE_ID, auth_token=token)
@@ -389,9 +394,11 @@ async def test_site_aget_measurement_sources_metadata(monkeypatch):
 
     assert site_ms == out
 
+
 # ------------------------
 # Data endpoints (inherited from BasePadSite)
 # ------------------------
+
 
 def test_site_get_realtime_updates(monkeypatch):
     token = 'tok'
@@ -399,7 +406,7 @@ def test_site_get_realtime_updates(monkeypatch):
     url_http = f"{RESTREAM_HOST}{ENDPOINTS.site_updates_websocket.value}".format(id=site.id)
     url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
 
-    messages = [{'k1':'v1'}, {'k2':2}, {'k3': None}]
+    messages = [{'k1': 'v1'}, {'k2': 2}, {'k3': None}]
 
     def fake_ws(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
         assert url_in == url_wss
@@ -420,14 +427,16 @@ async def test_site_aget_realtime_updates(monkeypatch):
     url_http = f"{RESTREAM_HOST}{ENDPOINTS.site_updates_websocket.value}".format(id=site.id)
     url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
 
-    messages = [{'k1':'v1'}, {'k2':2}, {'k3': None}]
+    messages = [{'k1': 'v1'}, {'k2': 2}, {'k3': None}]
 
     def fake_ws_async(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
         assert url_in == url_wss
         assert auth_token == token
+
         async def _agen():
             for m in messages:
                 yield m
+
         return _agen()
 
     monkeypatch.setattr(Communicator, 'websocket_generator_async', fake_ws_async)
@@ -515,9 +524,11 @@ async def test_site_aget_data(monkeypatch):
         # Check datetime conversion to UTC format
         assert params['start_datetime'] == '2020-01-01 00:00:00'
         assert params['end_datetime'] == '2020-01-01 01:00:00'
+
         async def _agen():
             for item in payload:
                 yield item
+
         return _agen()
 
     monkeypatch.setattr(Communicator, 'steaming_get_generator_async', fake_streaming)
@@ -548,6 +559,7 @@ async def test_site_aget_data(monkeypatch):
 # ------------------------
 # Data changes endpoints
 # ------------------------
+
 
 def test_site_get_data_changes(monkeypatch):
     token = 'tok'
