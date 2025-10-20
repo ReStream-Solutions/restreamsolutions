@@ -386,8 +386,8 @@ def test_pad_get_data(monkeypatch):
         # Check params mapping
         assert params['si_units'] == 'true'
         assert params['resolution'] == DataResolutions.SECOND.value
-        assert params['fields'] == ['a', 'b']
-        assert params['measurement_source'] == ['M1']
+        assert params['fields'] == 'a,b'
+        assert params['measurement_source'] == 'M1'
         assert params['routed'] == 'true'
         # No start/end provided here
         return iter(payload)

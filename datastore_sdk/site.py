@@ -240,7 +240,6 @@ class Site(BasePadSite):
         aggregation: DataAggregations = None,
         fields: str | list[str] = None,
         si_units: bool = False,
-        measurement_sources_names: str | list[str] = None,
         fill_data_method: DataFillMethods = None,
         fill_data_limit: int | None = None,
         inside_area_only: bool = True,
@@ -260,7 +259,6 @@ class Site(BasePadSite):
             fields (str | list[str] | None): Optional fields filter. Use get_fields_metadata() to
                 discover all available fields for this site.
             si_units (bool): If True, values are converted to SI units.
-            measurement_sources_names (str | list[str] | None): Filter by measurement source names.
             fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
                 to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
                 to fill missing values backward before the next known value. If provided, resolution must be
@@ -293,7 +291,6 @@ class Site(BasePadSite):
             aggregation=aggregation,
             fields=fields,
             si_units=si_units,
-            measurement_sources_names=measurement_sources_names,
             fill_data_method=fill_data_method,
             fill_data_limit=fill_data_limit,
             inside_area_only=inside_area_only,
@@ -309,7 +306,6 @@ class Site(BasePadSite):
         aggregation: DataAggregations = None,
         fields: str | list[str] = None,
         si_units: bool = False,
-        measurement_sources_names: str | list[str] = None,
         fill_data_method: DataFillMethods = None,
         fill_data_limit: int | None = None,
         inside_area_only: bool = True,
@@ -329,7 +325,6 @@ class Site(BasePadSite):
             fields (str | list[str] | None): Optional fields filter. Use aget_fields_metadata() to
                 discover all available fields for this site.
             si_units (bool): If True, values are converted to SI units.
-            measurement_sources_names (str | list[str] | None): Filter by measurement source names.
             fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
                 to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
                 to fill missing values backward before the next known value. If provided, resolution must be
@@ -362,7 +357,6 @@ class Site(BasePadSite):
             aggregation=aggregation,
             fields=fields,
             si_units=si_units,
-            measurement_sources_names=measurement_sources_names,
             fill_data_method=fill_data_method,
             fill_data_limit=fill_data_limit,
             inside_area_only=inside_area_only,

@@ -461,8 +461,7 @@ def test_site_get_data(monkeypatch):
         # Check params mapping
         assert params['si_units'] == 'true'
         assert params['resolution'] == DataResolutions.SECOND.value
-        assert params['fields'] == ['a', 'b']
-        assert params['measurement_source'] == ['M1']
+        assert params['fields'] == 'a,b'
         # No start/end provided here
         return iter(payload)
 
@@ -471,7 +470,6 @@ def test_site_get_data(monkeypatch):
     data_obj = site.get_data(
         fields=['a', 'b'],
         si_units=True,
-        measurement_sources_names=['M1'],
     )
 
     items = list(data_obj.data_fetcher)

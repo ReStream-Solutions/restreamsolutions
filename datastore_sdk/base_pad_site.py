@@ -1,7 +1,7 @@
 import secrets
 import warnings
 from datetime import datetime, timezone
-from typing import Any, Coroutine, Tuple
+from typing import Any, Tuple
 
 from datastore_sdk import StageNameFilters
 from datastore_sdk.base_interface import BaseInterface
@@ -337,7 +337,7 @@ class BasePadSite(BaseInterface):
             params['end_datetime'] = end_datetime.astimezone(timezone.utc).strftime(dt_format)
 
         if fields is not None:
-            params['fields'] = fields
+            params['fields'] = ','.join(fields)
 
         if stage_number is not None:
             params['stage_number'] = stage_number
@@ -349,7 +349,12 @@ class BasePadSite(BaseInterface):
             params['agg'] = aggregation.value
 
         if measurement_sources_names is not None:
-            params['measurement_source'] = measurement_sources_names
+            if isinstance(measurement_sources_names, str):
+                params['measurement_source'] = measurement_sources_names
+            elif isinstance(measurement_sources_names, list):
+                params['measurement_source'] = ','.join(measurement_sources_names)
+            else:
+                raise ValueError('measurement_sources_names must be a string or list of strings')
 
         if is_routed is not None:
             params['routed'] = str(is_routed).lower()
