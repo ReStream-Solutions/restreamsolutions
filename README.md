@@ -440,7 +440,7 @@ for message in updates.data_fetcher:
 # updates.save('./data/pad_realtime_updates.json', overwrite=True)
 ```
 
-### Real-time Measurements Data (WebSocket)
+#### Real-time Measurements Data (WebSocket)
 
 Use the following methods to open a WebSocket stream with measurements for a Site or Pad:
 - Pad: `get_realtime_measurements_data()` and `aget_realtime_measurements_data()`
