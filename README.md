@@ -6,7 +6,6 @@ This project provides a convenient Python SDK for interacting with the Tally Res
 - retrieve raw or sampled data from your Sites and Pads
 - get a list of changes that were applied to the data, download this data, and confirm that these changes were received
 - connect to a WebSocket room associated with a specific Site or Pad and receive new data in real time
-  (will be implemented in the next versions)
 
 ## Installation
 
@@ -187,6 +186,7 @@ frac_states = pad.get_states(stage_name_filter=StageNameFilters.FRAC)
 #### Monitoring state for real-time updates
 
 Since the current State of a site changes, you can monitor it by calling the `update()` method on the state object.
+However, there's a better approach — see the “Real-time Sites and Pads updates (WebSocket)” section below.
 
 ```python
 import time
@@ -476,7 +476,7 @@ for item in live_only_stream.data_fetcher:
     print(item)
 ```
 
-**VERY IMPORTANT**: session_key usage
+**VERY IMPORTANT: session_key usage**
 - The SDK maintains resilient WebSocket connections and will automatically reuse the same session_key to continue reading from the same message queue after transient network errors or normal closes (when restart flags are enabled).
 - If your whole Python process crashes or is restarted, you may want to resume from where you left off to avoid missing updates. To do so, persist the session_key returned as the second value from the method call (e.g., `data, session_key = pad.get_realtime_measurements_data(...)`) in a durable store (database, etc.), and supply it on the next start.
 - **Never create multiple concurrent connections that use the same session_key**. Doing so can lead to incorrect results or duplicated messages for each connected client.
