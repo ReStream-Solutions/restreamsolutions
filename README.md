@@ -1,6 +1,6 @@
 # Datastore SDK
 
-This project provides a convenient Python SDK for interacting with the Tally Resteam API. Using this SDK, you can:
+This project provides a convenient Python SDK for interacting with the Tally Restream API. Using this SDK, you can:
 - check the configuration of your Sites and Pads and receive updates in real time
 - get information about the current and historical stages of the Sites with additional aggregated metrics
 - retrieve raw or sampled data from your Sites and Pads
@@ -279,7 +279,7 @@ To get data for a pad or site, use the `get_data()` or `aget_data()` (async) met
 `DataAsync` objects, which can be used for streaming or saving to a file.
 
 For pads, the `is_routed` parameter (default `False`) controls whether the data is distributed by its specific 
-site (`True`) or returned for the entire pad (`False`). See `get_data()` documentation to get more details.
+site (`True`) or returned for the entire pad (`False`). See the `get_data()` documentation for more details.
 
 ```python
 from datetime import datetime, timezone
@@ -398,14 +398,14 @@ if change_events:
 
 #### Real-time data change events (WebSocket)
 
-In addition to periodically checking for changes via get_data_changes/aget_data_changes, you can subscribe to a
-live stream of data-change events over WebSocket using get_realtime_data_changes_updates() and
-aget_realtime_data_changes_updates() on Site and Pad objects.
+In addition to periodically checking for changes via `get_data_changes()`/`aget_data_changes()`, you can subscribe to a
+live stream of data-change events over WebSocket using `get_realtime_data_changes_updates()` and
+`aget_realtime_data_changes_updates()` on `Site` and `Pad` objects.
 
-Important: these functions return data-change events as dict objects (metadata only) and do not include the
-changed data itself. To load the actual records, use the Data and DataAsync objects returned by
-get_data_changes() and aget_data_changes() on Site/Pad. Those methods return a list of change events and a convenient
-Data/DataAsync from which you can iterate over the affected records or save them to a file.
+Important: these functions return data-change events as Python `dict` objects (metadata only) and do not include the
+changed data itself. To load the actual records, use the `Data`/`DataAsync` objects returned by
+`get_data_changes()` and `aget_data_changes()` on `Site`/`Pad`. Those methods return a list of change events as a convenient
+`Data`/`DataAsync` from which you can iterate over the affected records or save them to a file.
 
 ```python
 from datastore_sdk import Pad
@@ -420,8 +420,8 @@ for event in updates.data_fetcher:  # event is a dict with change metadata (id, 
 #### Real-time Sites and Pads updates (WebSocket)
 
 You can subscribe to a continuous stream of real-time updates for a Pad (or Site) via WebSocket.
-The method returns a lazy Data/DataAsync object whose data_fetcher yields updates one by one.
-Use `get_realtime_instance_updates()` and `aget_realtime_instance_updates()` methods of the Pad and Site classes.
+The method returns a lazy `Data`/`DataAsync` object whose `data_fetcher` yields updates one by one.
+Use `get_realtime_instance_updates()` and `aget_realtime_instance_updates()` methods of the `Pad` and `Site` classes.
 
 ```python
 from datastore_sdk import Pad
