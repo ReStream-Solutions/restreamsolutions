@@ -462,16 +462,18 @@ class BasePadSite(BaseInterface):
 
         if not session_key:
             session_key = secrets.token_hex(16)
-        additional_headers = {'session-key': session_key}
+        params = {'session_key': session_key}
 
         # All measurement WebSockets expect to receive an acknowledgement message after each successful delivery.
-        ack_message = {"ack": True}
+        ack_message = {"ack": "true"}
+        # Each message from the WebSocket follows this schema:
+        # {"session_key": "key", "message": {"k1": "v1", "k2": "v2"...}}
         get_nested_key = 'message'
 
         return {
             'auth_token': auth_token,
             'url': url,
-            'additional_headers': additional_headers,
+            'params': params,
             'ack_message': ack_message,
             'get_nested_key': get_nested_key,
             'session_key': session_key,

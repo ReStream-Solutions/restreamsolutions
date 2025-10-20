@@ -5,6 +5,7 @@ import sys
 from decimal import Decimal
 from typing import Generator, Any, AsyncGenerator, Optional, Iterable, Dict, List
 import warnings
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 import aiohttp
 import requests
@@ -125,6 +126,28 @@ class Communicator:
         if as_list_of_strings:
             headers = [f"{k}: {v}" for k, v in headers.items()]
         return headers or None
+
+    @staticmethod
+    def _add_query_params(url: str, params: dict) -> str:
+        """Add query params to a URL."""
+        if not params:
+            return url
+        parts = list(urlparse(url))  # [scheme, netloc, path, params, query, fragment]
+        if len(parts) < 5:
+            warnings.warn(f"URL is too short: {url}", RuntimeWarning)
+        existing = parse_qsl(parts[4], keep_blank_values=True)
+
+        extra = []
+        for k, v in params.items():
+            if v is None:
+                continue
+            if isinstance(v, (list, tuple)):
+                extra.extend((k, str(x)) for x in v if x is not None)
+            else:
+                extra.append((k, str(v)))
+
+        parts[4] = urlencode(existing + extra, doseq=True)
+        return str(urlunparse(parts))
 
     @staticmethod
     def _check_response_status_code(
@@ -352,13 +375,7 @@ class Communicator:
             Raw message payloads as provided by the server (str for TEXT, bytes for BINARY).
         """
 
-        # Build URL with params using requests' PreparedRequest (no custom URL builder)
-        if params:
-            req = requests.Request("GET", url, params=params).prepare()
-            full_url = req.url
-        else:
-            full_url = url
-
+        full_url = Communicator._add_query_params(url, params)
         # Build headers and convert to list of "Key: Value" strings as expected by websocket-client
         header_list = Communicator._create_headers(auth_token, additional_headers, as_list_of_strings=True)
         ws = WebSocket(skip_utf8_validation=True)
