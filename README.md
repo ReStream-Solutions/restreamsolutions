@@ -186,7 +186,7 @@ frac_states = pad.get_states(stage_name_filter=StageNameFilters.FRAC)
 #### Monitoring state for real-time updates
 
 Since the current State of a site changes, you can monitor it by calling the `update()` method on the state object.
-However, there's a better approach — see the “Real-time Sites and Pads updates (WebSocket)” section below.
+However, there's a better approach — see the “Real-time Sites and Pads updates” section below.
 
 ```python
 import time
@@ -396,7 +396,22 @@ if change_events:
     first_change_event.confirm_data_received()
 ```
 
-#### Real-time data change events (WebSocket)
+### Real-time data via WebSockets
+
+The SDK supports receiving data in real time over WebSocket. The following stream types and methods are available:
+- Data change events (metadata only): `get_realtime_data_changes_updates()` / `aget_realtime_data_changes_updates()`
+- Site/Pad instance updates (includes site states updates): `get_realtime_instance_updates()` / `aget_realtime_instance_updates()`
+- Measurement streams: `get_realtime_measurements_data()` / `aget_realtime_measurements_data()`
+
+Common behavior and tips:
+- All methods return lazy `Data`/`DataAsync` objects; read incoming messages by iterating over `data_fetcher`.
+- Use `get_*` for synchronous code, and `aget_*` for asynchronous code.
+- Streams can be saved to files using the `save(...)`/`asave(...)` method on the returned `Data`/`DataAsync`.
+- For measurement streams, a `session_key` is also returned so that you can resume reading the queue after a process restart — details are provided in the dedicated section below.
+
+Detailed subsections for each real-time option are provided below.
+
+#### Real-time data change events
 
 In addition to periodically checking for changes via `get_data_changes()`/`aget_data_changes()`, you can subscribe to a
 live stream of data-change events over WebSocket using `get_realtime_data_changes_updates()` and
@@ -417,7 +432,7 @@ for event in updates.data_fetcher:  # event is a dict with change metadata (id, 
     print(event)
 ```
 
-#### Real-time Sites and Pads updates (WebSocket)
+#### Real-time Sites and Pads updates
 
 You can subscribe to a continuous stream of real-time updates for a Pad (or Site) via WebSocket.
 The method returns a lazy `Data`/`DataAsync` object whose `data_fetcher` yields updates one by one.
@@ -440,7 +455,7 @@ for message in updates.data_fetcher:
 # updates.save('./data/pad_realtime_updates.json', overwrite=True)
 ```
 
-#### Real-time Measurements Data (WebSocket)
+#### Real-time Measurements Data
 
 Use the following methods to open a WebSocket stream with measurements for a Site or Pad:
 - Pad: `get_realtime_measurements_data()` and `aget_realtime_measurements_data()`
