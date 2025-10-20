@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 
 from datastore_sdk.base_pad_site import BasePadSite
 from datastore_sdk.constants import ENDPOINTS, StageNameFilters, DataResolutions, DataAggregations, DataFillMethods
@@ -361,6 +361,140 @@ class Site(BasePadSite):
             fill_data_limit=fill_data_limit,
             inside_area_only=inside_area_only,
         )
+
+    def get_realtime_measurements_data(
+        self,
+        session_key: str | None = None,
+        restart_on_error: bool = True,
+        restart_on_close: bool = True,
+        start_datetime: datetime = None,
+        end_datetime: datetime = None,
+        stage_number: int = None,
+        stage_name_filter: StageNameFilters = None,
+        resolution: DataResolutions = DataResolutions.SECOND,
+        aggregation: DataAggregations = None,
+        fields: str | list[str] = None,
+        si_units: bool = False,
+        fill_data_method: DataFillMethods = None,
+        fill_data_limit: int | None = None,
+        inside_area_only: bool = True,
+    ) -> Tuple[Data, str]:
+        """Open a WebSocket stream of real-time measurements for this Site (sync).
+
+        Works with the same filters as get_data. If filters are provided, the stream first yields
+        the historical data matching the filters, then continues with real-time updates.
+
+        Parameters:
+            session_key (str | None): Optional session identifier to resume an existing stream.
+            restart_on_error (bool): If True, the Data will auto-reconnect on errors.
+            restart_on_close (bool): If True, the Data will also restart when the stream closes normally.
+            start_datetime (datetime | None): Inclusive start; must be timezone-aware.
+            end_datetime (datetime | None): Inclusive end; must be timezone-aware.
+            stage_number (int | None): Optional stage number to filter by (requires stage_name_filter; see below).
+            stage_name_filter (StageNameFilters | None): Filter for stage names (frac, wireline, etc.).
+            resolution (DataResolutions): Sampling resolution of the output series (seconds, minutes, hours, etc.).
+            aggregation (DataAggregations | None): Optional aggregation to apply.
+            fields (str | list[str] | None): Optional fields filter. Use get_fields_metadata() to
+                discover all available fields for this site.
+            si_units (bool): If True, values are converted to SI units.
+            fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
+                to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
+                to fill missing values backward before the next known value. If provided, resolution must be
+                DataResolutions.SECOND and aggregation must be None.
+            fill_data_limit (int | None): Required when fill_data_method is provided. Maximum number of seconds to fill
+                per gap: for FORWARD_FILL this applies after a known value; for BACKWARD_FILL this applies before a
+                known value. Has no effect if fill_data_method is not provided. Must be a positive integer.
+            inside_area_only (bool): Optional. Default True. Controls whether filling is restricted to internal gaps
+                between original values (True) or may extend across edges (False). Has effect only when
+                fill_data_method is provided.
+
+        Returns:
+            tuple[Data, str]: A Data object that lazily yields messages and the session_key used.
+        """
+        data, key = super().get_realtime_measurements_data(
+            session_key=session_key,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            stage_number=stage_number,
+            stage_name_filter=stage_name_filter,
+            resolution=resolution,
+            aggregation=aggregation,
+            fields=fields,
+            si_units=si_units,
+            fill_data_method=fill_data_method,
+            fill_data_limit=fill_data_limit,
+            inside_area_only=inside_area_only,
+        )
+        return data, key
+
+    async def aget_realtime_measurements_data(
+        self,
+        session_key: str | None = None,
+        restart_on_error: bool = True,
+        restart_on_close: bool = True,
+        start_datetime: datetime = None,
+        end_datetime: datetime = None,
+        stage_number: int = None,
+        stage_name_filter: StageNameFilters = None,
+        resolution: DataResolutions = DataResolutions.SECOND,
+        aggregation: DataAggregations = None,
+        fields: str | list[str] = None,
+        si_units: bool = False,
+        fill_data_method: DataFillMethods = None,
+        fill_data_limit: int | None = None,
+        inside_area_only: bool = True,
+    ) -> Tuple[DataAsync, str]:
+        """Open a WebSocket stream of real-time measurements for this Site (async).
+
+        Works with the same filters as aget_data. If filters are provided, the stream first yields
+        the historical data matching the filters, then continues with real-time updates.
+
+        Parameters:
+            session_key (str | None): Optional session identifier to resume an existing stream.
+            restart_on_error (bool): If True, the DataAsync will auto-reconnect on errors.
+            restart_on_close (bool): If True, the DataAsync will also restart when the stream closes normally.
+            start_datetime (datetime | None): Inclusive start; must be timezone-aware.
+            end_datetime (datetime | None): Inclusive end; must be timezone-aware.
+            stage_number (int | None): Optional stage number to filter by (requires stage_name_filter; see below).
+            stage_name_filter (StageNameFilters | None): Filter for stage names (frac, wireline, etc.).
+            resolution (DataResolutions): Sampling resolution of the output series (seconds, minutes, hours, etc.).
+            aggregation (DataAggregations | None): Optional aggregation to apply.
+            fields (str | list[str] | None): Optional fields filter. Use aget_fields_metadata() to
+                discover all available fields for this site.
+            si_units (bool): If True, values are converted to SI units.
+            fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
+                to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
+                to fill missing values backward before the next known value. If provided, resolution must be
+                DataResolutions.SECOND and aggregation must be None.
+            fill_data_limit (int | None): Required when fill_data_method is provided. Maximum number of seconds to fill
+                per gap: for FORWARD_FILL this applies after a known value; for BACKWARD_FILL this applies before a
+                known value. Has no effect if fill_data_method is not provided. Must be a positive integer.
+            inside_area_only (bool): Optional. Default True. Controls whether filling is restricted to internal gaps
+                between original values (True) or may extend across edges (False). Has effect only when
+                fill_data_method is provided.
+
+        Returns:
+            tuple[DataAsync, str]: A DataAsync object that lazily yields messages and the session_key used.
+        """
+        data_async, key = await super().aget_realtime_measurements_data(
+            session_key=session_key,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            stage_number=stage_number,
+            stage_name_filter=stage_name_filter,
+            resolution=resolution,
+            aggregation=aggregation,
+            fields=fields,
+            si_units=si_units,
+            fill_data_method=fill_data_method,
+            fill_data_limit=fill_data_limit,
+            inside_area_only=inside_area_only,
+        )
+        return data_async, key
 
     def get_realtime_instance_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:
         """Creates a Data class, containing a lazy WebSocket stream of real-time updates for this Site.

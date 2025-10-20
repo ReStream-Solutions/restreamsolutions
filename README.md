@@ -440,6 +440,47 @@ for message in updates.data_fetcher:
 # updates.save('./data/pad_realtime_updates.json', overwrite=True)
 ```
 
+### Real-time Measurements Data (WebSocket)
+
+Use the following methods to open a WebSocket stream with measurements for a Site or Pad:
+- Pad: `get_realtime_measurements_data()` and `aget_realtime_measurements_data()`
+- Site: `get_realtime_measurements_data()` and `aget_realtime_measurements_data()`
+
+These methods accept the same filter parameters as `get_data()`/`aget_data()`.
+
+Important behavior of filters:
+- If you DO pass any filters (for example start_datetime/end_datetime, fields, stage filters, etc.), the stream will
+first replay the historical data that matches those filters and then continue with real-time updates.
+- If you DO NOT pass any filters, only fresh real-time updates will be delivered. No historical backlog will be sent.
+
+```python
+from datetime import datetime, timezone
+from datastore_sdk import Pad, StageNameFilters
+
+pad = Pad(id=681)
+
+# With filters: first get historical, then live
+stream, session_key = pad.get_realtime_measurements_data(
+    start_datetime=datetime(2025, 9, 9, tzinfo=timezone.utc),
+    end_datetime=datetime(2025, 9, 9, minute=1, tzinfo=timezone.utc),
+    is_routed=True,
+    stage_name_filter=StageNameFilters.FRAC,
+    fields=["pressure", "rate"]
+)
+for item in stream.data_fetcher:
+    print(item)
+
+# Without filters: live only (no historical replay)
+live_only_stream, live_session_key = pad.get_realtime_measurements_data()
+for item in live_only_stream.data_fetcher:
+    print(item)
+```
+
+**VERY IMPORTANT**: session_key usage
+- The SDK maintains resilient WebSocket connections and will automatically reuse the same session_key to continue reading from the same message queue after transient network errors or normal closes (when restart flags are enabled).
+- If your whole Python process crashes or is restarted, you may want to resume from where you left off to avoid missing updates. To do so, persist the session_key returned as the second value from the method call (e.g., `data, session_key = pad.get_realtime_measurements_data(...)`) in a durable store (database, etc.), and supply it on the next start.
+- **Never create multiple concurrent connections that use the same session_key**. Doing so can lead to incorrect results or duplicated messages for each connected client.
+
 ## Running tests
 
 Run from the repository root folder
