@@ -7,17 +7,31 @@ This project provides a convenient Python SDK for interacting with the Tally Res
 - get a list of changes that were applied to the data, download this data, and confirm that these changes were received
 - connect to a WebSocket room associated with a specific Site or Pad and receive new data in real time
 
-## Installation
+## Installation and Build
 
-Via pip (from the published package):
+Build a wheel package from sources:
 
 ```bash
-pip install restream-datastore-sdk
+# Requires Poetry to be installed
+# Run from the repository root
+./build.sh
 ```
 
-Or from source (via Poetry):
+Where to find the .whl file:
+- After running the script, the built artifact will be in the `dist/` directory.
+- The name will look like: `datastore_sdk-<version>-py3-none-any.whl`.
+
+Use in another project (local installation from the .whl file):
 
 ```bash
+# From the other project's directory
+pip install /full/path/to/restream_datastore_sdk-<version>-py3-none-any.whl
+```
+
+Install for local development from sources (optional):
+
+```bash
+# Requires Poetry to be installed
 poetry install
 ```
 
