@@ -489,8 +489,13 @@ class BasePadSite(BaseInterface):
         session_key: str = None,
         restart_on_error: bool = True,
         restart_on_close: bool = True,
+        **filters,
     ) -> Tuple[Data, str]:
         """Open a WebSocket stream of real-time measurements (sync).
+
+        You can use the same named parameters for filters as those used in the get_data method of the current instance
+        (Site or Pad). In this case, the WebSocket will first return historical data according to the specified
+        parameters and then start sending new real-time data.
 
         Parameters:
             session_key: Optional session identifier to resume/associate a stream.
@@ -498,19 +503,22 @@ class BasePadSite(BaseInterface):
             to the server if an error occurs.
             restart_on_close: If True, the Data instance will also recreate the underlying generator when
             the stream completes normally (e.g., clean WebSocket close) and continue streaming.
+            **filters: filters: Named parameters available for the get_data method
 
         Returns:
             A tuple of (Data, session_key) where Data lazily yields messages and session_key is the key in use.
         """
-        params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
-        data_generator_factory = lambda: Communicator.websocket_generator(**params)
+        query_params = self._build_get_data_params(**filters) if filters else {}
+        system_params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
+        system_params['params'] = {**system_params.get('params', {}), **query_params}
+        data_generator_factory = lambda: Communicator.websocket_generator(**system_params)
         return (
             Data(
                 data_generator_factory,
                 restart_on_error=restart_on_error,
                 restart_on_close=restart_on_close,
             ),
-            params['session_key'],
+            system_params['session_key'],
         )
 
     async def aget_realtime_measurements_data(
@@ -518,8 +526,13 @@ class BasePadSite(BaseInterface):
         session_key: str = None,
         restart_on_error: bool = True,
         restart_on_close: bool = True,
+        **filters,
     ) -> Tuple[DataAsync, str]:
         """Open a WebSocket stream of real-time measurements (async).
+
+        You can use the same named parameters for filters as those used in the aget_data method of the current instance
+        (Site or Pad). In this case, the WebSocket will first return historical data according to the specified
+        parameters and then start sending new real-time data.
 
         Parameters:
             session_key: Optional session identifier to resume/associate a stream.
@@ -527,19 +540,22 @@ class BasePadSite(BaseInterface):
             to the server if an error occurs.
             restart_on_close: If True, the DataAsync instance will also recreate the underlying async generator when
             the stream completes normally (e.g., clean WebSocket close) and continue streaming.
+            **filters: filters: Named parameters available for the aget_data method
 
         Returns:
             A tuple of (DataAsync, session_key) where DataAsync lazily yields messages on async iteration.
         """
-        params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
-        data_generator_factory = lambda: Communicator.websocket_generator_async(**params)
+        query_params = self._build_get_data_params(**filters) if filters else {}
+        system_params = self._prepare_measurements_websocket_params(self._api_url_data_websocket, session_key)
+        system_params['params'] = {**system_params.get('params', {}), **query_params}
+        data_generator_factory = lambda: Communicator.websocket_generator_async(**system_params)
         return (
             DataAsync(
                 data_generator_factory,
                 restart_on_error=restart_on_error,
                 restart_on_close=restart_on_close,
             ),
-            params['session_key'],
+            system_params['session_key'],
         )
 
     def _get_real_time_updates_object(
