@@ -292,8 +292,8 @@ print(f'Site fields: {site_fields}')
 To get data for a pad or site, use the `get_data()` or `aget_data()` (async) method. These methods return lazy `Data` or
 `DataAsync` objects, which can be used for streaming or saving to a file.
 
-For pads, the `is_routed` parameter (default `False`) controls whether the data is distributed by its specific 
-site (`True`) or returned for the entire pad (`False`). See the `get_data()` documentation for more details.
+For pads, the `is_routed` parameter (default `False`) controls whether the data is distributed by their specific 
+sites (`True`) or returned for the entire pad (`False`). See the `get_data()` documentation for more details.
 
 ```python
 from datetime import datetime, timezone
