@@ -494,7 +494,7 @@ stream, session_key = pad.get_realtime_measurements_data(
     end_datetime=datetime(2025, 9, 9, minute=1, tzinfo=timezone.utc),
     is_routed=True,
     stage_name_filter=StageNameFilters.FRAC,
-    fields=["pressure", "rate"]
+    fields=["down_hole_pressure", "slurry_rate"]
 )
 for item in stream.data_fetcher:
     print(item)
