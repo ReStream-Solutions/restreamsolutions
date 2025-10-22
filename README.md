@@ -223,12 +223,12 @@ previous stages with optional filters.
 ```python
 from datetime import datetime, timezone
 from datastore_sdk import Site, StageNameFilters
-site = Site(id=981)
-start_date = datetime(2025, 9, 17, 0, 0, 0, tzinfo=timezone.utc)
-end_date = datetime(2025, 9, 18, 0, 0, 0, tzinfo=timezone.utc)
+site = Site(id=1113)
+start_date = datetime(2025, 10, 1, 0, 0, 0, tzinfo=timezone.utc)
+end_date = datetime(2025, 10, 18, 0, 0, 0, tzinfo=timezone.utc)
 
 # Get stages within a date range
-stages_from_range = site.get_stages_metadata(start_date=start_date, end_date=end_date)
+stages_from_range = site.get_stages_metadata(start=start_date, end=end_date)
 for stage in stages_from_range[:3]:
     print(f"ID: {stage['id']}, State: {stage['state']}, Start: {stage['start']}")
 
@@ -241,7 +241,7 @@ You can also include aggregated metrics for each stage by setting `add_aggregati
 ```python
 from datetime import datetime, timezone
 from datastore_sdk import Site, StageNameFilters
-site = Site(id=981)
+site = Site(id=1113)
 start_date = datetime(2025, 9, 17, 0, 0, 0, tzinfo=timezone.utc)
 end_date = datetime(2025, 9, 18, 0, 0, 0, tzinfo=timezone.utc)
 stages_with_aggregations = site.get_stages_metadata(
@@ -267,7 +267,7 @@ measurement_sources = Pad(id=681).get_measurement_sources_metadata()
 print(f'Pad measurement sources: {measurement_sources}')
 
 # For a specific site
-site = Site(id=981)
+site = Site(id=1111)
 measurement_sources = site.get_measurement_sources_metadata()
 print(f'Site measurement sources: {measurement_sources}')
 ```
