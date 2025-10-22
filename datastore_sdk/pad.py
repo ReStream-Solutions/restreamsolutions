@@ -5,6 +5,7 @@ from datastore_sdk import StageNameFilters
 from datastore_sdk.base_pad_site import BasePadSite
 from datastore_sdk.constants import ENDPOINTS, DataResolutions, DataAggregations, DataFillMethods
 from datastore_sdk.data_object import Data, DataAsync
+from datastore_sdk.site import Site
 from datastore_sdk.exceptions import APICompatibilityError
 
 
@@ -50,7 +51,81 @@ class Pad(BasePadSite):
     completion_date: datetime
     wireline_enabled: bool
 
-    def get_sites(self, as_dict=False, **filters) -> list['Site'] | list[dict[str, Any]]:
+    @classmethod
+    def get_models(
+        cls,
+        auth_token: str = None,
+        as_dict=False,
+        complete: bool | None = None,
+        well_api: str | None = None,
+        site_pk: int | None = None,
+        **filters
+    ) -> "list[Pad] | list[dict]":
+        """Fetch Pad objects from the API.
+
+        Parameters:
+            auth_token (str | None): Optional auth token; falls back to environment variable
+             RESTREAM_AUTH_TOKEN if not provided.
+            as_dict (bool): When True, return plain dicts instead of Pad instances. Default False.
+            complete (bool | None): Filter the received pads by the complete attribute. Defaults to None (no filtering).
+                If False, request the minimal representation. If None, use API default.
+            well_api (str | None): Optional well API (well identifier) used to filter pads by the site with
+            the provided well API.
+            site_pk (int | None): Optional site primary key to filter pads by a specific site.
+            **filters: Additional query parameters supported by the API.
+
+        Returns:
+            list[Pad] | list[dict]: A list of Pad objects (or dicts when as_dict=True).
+
+        Raises:
+            AuthError: If authentication fails.
+            APICompatibilityError: If the endpoint is unavailable or the response format is not supported by
+                the current version of this package.
+            APIConcurrencyLimitError: If the API rate limit is reached.
+            HTTPError: For other non-2xx HTTP responses.
+        """
+        return super().get_models(
+            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk, **filters
+        )
+
+    @classmethod
+    async def aget_models(
+        cls,
+        auth_token: str = None,
+        as_dict=False,
+        complete: bool | None = None,
+        well_api: str | None = None,
+        site_pk: int | None = None,
+        **filters
+    ) -> "list[Pad] | list[dict]":
+        """Asynchronously fetch Pad objects from the API.
+
+        Parameters:
+            auth_token (str | None): Optional auth token; falls back to environment variable
+             RESTREAM_AUTH_TOKEN if not provided.
+            as_dict (bool): When True, return plain dicts instead of Pad instances. Default False.
+            complete (bool | None): Filter the received pads by the complete attribute. Defaults to None (no filtering).
+                If False, request the minimal representation. If None, use API default.
+            well_api (str | None): Optional well API (well identifier) used to filter pads by the site with
+            the provided well API.
+            site_pk (int | None): Optional site primary key to filter pads by a specific site.
+            **filters: Additional query parameters supported by the API.
+
+        Returns:
+            list[Pad] | list[dict]: A list of Pad objects (or dicts when as_dict=True).
+
+        Raises:
+            AuthError: If authentication fails.
+            APICompatibilityError: If the endpoint is unavailable or the response format is not supported by
+                the current version of this package.
+            APIConcurrencyLimitError: If the API rate limit is reached.
+            HTTPError: For other non-2xx HTTP responses.
+        """
+        return await super().aget_models(
+            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk, **filters
+        )
+
+    def get_sites(self, as_dict=False, **filters) -> list[Site] | list[dict[str, Any]]:
         """Fetch all Site objects that belong to this Pad.
 
         Parameters:
