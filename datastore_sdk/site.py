@@ -32,6 +32,8 @@ class Site(BasePadSite):
       - is_demo_site (bool): Whether this is a demo site.
       - stage_total (int): Total number of stages for this site.
       - timezone (str): Timezone name for this site.
+      - current_stage_number (int): Current stage number.
+      - current_state (str): Current state for this site ('frac_frac', 'standby_standby', 'wl_*').
     """
 
     _api_url_single_object: str = ENDPOINTS.sites_one.value
@@ -60,6 +62,8 @@ class Site(BasePadSite):
     is_demo_site: bool
     stage_total: int
     timezone: str
+    current_stage_number: int
+    current_state: str
 
     def get_state(self, as_dict: bool = False) -> Optional['State'] | Optional[dict[str, Any]]:
         """Fetch the current State object for this site.
