@@ -358,6 +358,7 @@ class Communicator:
         auth_token: str,
         params: Optional[dict] = None,
         ack_message: Optional[dict] = None,
+        ack_after: int = 5,
         additional_headers: Optional[Iterable[Dict[str, str]]] = None,
         get_nested_key: str = None,
         **kwargs,
@@ -369,7 +370,9 @@ class Communicator:
             auth_token: Access token for Authorization header.
             params: Optional query parameters passed to the connection (added to URL using requests' prepared request).
             ack_message: Optional dict to send as JSON after each received message as an ACK.
+            ack_after: Send ack message after this number of received messages.
             additional_headers: Optional list of dicts to merge into the request headers.
+            get_nested_key: Receive only this key from the message.
 
         Yields:
             Raw message payloads as provided by the server (str for TEXT, bytes for BINARY).
@@ -382,12 +385,19 @@ class Communicator:
         # Use unlimited timeout (blocking). Users can wrap this in their own timeout logic if needed.
         try:
             ws.connect(full_url, header=header_list)
+            i = 0
             while True:
                 data = ws.recv()
+                i += 1
                 if data is None:
                     break
                 if isinstance(data, str):
+                    # Sometimes we receive messages that contain an empty string. Let's just skip them.
+                    if data == "":
+                        continue
                     data = json.loads(data)
+                if data is None:
+                    continue
                 if get_nested_key is not None:
                     data = data[get_nested_key]
                 if isinstance(data, list):
@@ -395,7 +405,7 @@ class Communicator:
                         yield item
                 else:
                     yield data
-                if ack_message:
+                if ack_message and (i % ack_after) == 0:
                     ws.send(json.dumps(ack_message))
 
         except WebSocketConnectionClosedException:
@@ -420,6 +430,7 @@ class Communicator:
         auth_token: str,
         params: Optional[dict] = None,
         ack_message: Optional[dict] = None,
+        ack_after: int = 5,
         additional_headers: Optional[Iterable[Dict[str, str]]] = None,
         get_nested_key: str = None,
         **kwargs,
@@ -431,7 +442,9 @@ class Communicator:
             auth_token: Access token for Authorization header.
             params: Optional query parameters to append to the URL.
             ack_message: Optional dict to send as JSON after each received message as an ACK.
+            ack_after: Send ack message after this number of received messages.
             additional_headers: Optional list of dicts to merge into the request headers.
+            get_nested_key: Receive only this key from the message.
 
         Yields:
             Raw message payloads as provided by the server (str for TEXT, bytes for BINARY).
@@ -442,12 +455,19 @@ class Communicator:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             try:
                 async with session.ws_connect(url, headers=headers, params=params) as ws:
+                    i = 0
                     while True:
                         msg = await ws.receive()
+                        i += 1
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = msg.data
                             if isinstance(data, str):
+                                # Sometimes we receive messages that contain an empty string. Let's just skip them.
+                                if data == "":
+                                    continue
                                 data = json.loads(data)
+                            if data is None:
+                                continue
                             if get_nested_key is not None:
                                 # Only attempt to parse JSON and extract when a nested key is requested
                                 data = data[get_nested_key]
@@ -456,11 +476,11 @@ class Communicator:
                                     yield item
                             else:
                                 yield data
-                            if ack_message:
+                            if ack_message and (i % ack_after) == 0:
                                 await ws.send_json(ack_message)
                         elif msg.type == aiohttp.WSMsgType.BINARY:
                             yield msg.data
-                            if ack_message:
+                            if ack_message and (i % ack_after) == 0:
                                 await ws.send_json(ack_message)
                         elif msg.type in (
                             aiohttp.WSMsgType.CLOSE,

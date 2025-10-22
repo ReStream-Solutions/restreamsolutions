@@ -120,6 +120,7 @@ class Data(BaseData):
                     warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
                     time.sleep(1)
                     continue
+                warnings.warn(f"The connection was closed. Reconnecting", RuntimeWarning)
 
         return _wrapper()
 
@@ -254,6 +255,7 @@ class DataAsync(BaseData):
                     warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
                     await asyncio.sleep(1)
                     continue
+                warnings.warn(f"The connection was closed. Reconnecting", RuntimeWarning)
 
         return _wrapper()
 

@@ -475,7 +475,7 @@ def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
     sent = []
     closed = {"flag": False}
     captured = {}
-    recv_queue = ['{"k1":"v1"}', '{"k2":2}', None]
+    recv_queue = ['{"k1":"v1"}', '{"k2":2}', '{"k2":3}', '{"k2":4}', '{"k2":5}', None]
 
     class DummyWS:
         def __init__(self, skip_utf8_validation=True):
@@ -500,15 +500,15 @@ def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
         url="wss://example.org/ws",
         auth_token="TOKEN123",
         params={"a": "1"},
-        ack_message={"ack": True},
+        ack_message={"ack": "true"},
         additional_headers=[{"X-Test": "Yes"}],
     )
 
     out = list(gen)
 
     # Yields raw messages and sends ACK for each
-    assert out == [{"k1": 'v1'}, {'k2': 2}]
-    assert sent == [json.dumps({"ack": True}), json.dumps({"ack": True})]
+    assert out == [{"k1": 'v1'}, {'k2': 2}, {'k2': 3}, {'k2': 4}, {'k2': 5}]
+    assert sent == [json.dumps({"ack": "true"})]
 
     # Connection closed in finally
     assert closed["flag"] is True
@@ -601,6 +601,9 @@ def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
             # Prepare a sequence of TEXT, BINARY, CLOSE
             seq = [
                 types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v1"}'),
+                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v2"}'),
+                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v3"}'),
+                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v4"}'),
                 types.SimpleNamespace(type=aiohttp.WSMsgType.BINARY, data=b'data'),
                 types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSE, data=None),
             ]
@@ -630,13 +633,13 @@ def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
         url="wss://example.org/ws",
         auth_token="TOKEN-ASYNC",
         params={"p": "9"},
-        ack_message={"ok": 1},
+        ack_message={"ok": "true"},
         additional_headers=[{"X-Extra": "Z"}],
     )
 
     out = asyncio.run(_collect_async_gen(gen))
 
-    assert out == [{'k1': 'v1'}, b'data']
+    assert out == [{'k1': 'v1'}, {'k1': 'v2'}, {'k1': 'v3'}, {'k1': 'v4'}, b'data']
 
     # Validate headers and params passed to ws_connect
     captured = holder["session"].captured
@@ -647,7 +650,7 @@ def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
     assert headers["X-Extra"] == "Z"
 
     # Two ACKs were sent (for TEXT and BINARY)
-    assert captured["acks"] == [{"ok": 1}, {"ok": 1}]
+    assert captured["acks"] == [{"ok": "true"}]
 
 
 def test_websocket_generator_async_error_raises(monkeypatch):
