@@ -20,7 +20,7 @@ class BaseInterface:
 
         Args:
             id: Unique identifier of the model instance.
-            auth_token: Optional auth token used for API requests; if not provided, environment variable TALLY_AUTH_TOKEN
+            auth_token: Optional auth token used for API requests; if not provided, environment variable RESTREAM_AUTH_TOKEN
             will be used instead.
             **kwargs: Additional fields which will be set as attributes of the instance with possible type conversions
             according to the type hints of the child class.
@@ -81,7 +81,7 @@ class BaseInterface:
     def _select_token(cls, auth_token: str) -> str | None:
         """Choose the authentication token to use for requests.
 
-        Prefers the explicitly provided token; falls back to the TALLY_AUTH_TOKEN
+        Prefers the explicitly provided token; falls back to the RESTREAM_AUTH_TOKEN
         environment variable if not provided.
 
         Args:
@@ -90,7 +90,7 @@ class BaseInterface:
         Returns:
             The selected token string or None if nothing is available.
         """
-        return auth_token or os.environ.get("TALLY_AUTH_TOKEN")
+        return auth_token or os.environ.get("RESTREAM_AUTH_TOKEN")
 
     @classmethod
     def _build_multiple_from_response(cls, json_response, auth_token: str, as_dict: bool):
@@ -150,7 +150,7 @@ class BaseInterface:
 
         Args:
             id: Identifier of the object to fetch.
-            auth_token: Optional auth token; falls back to environment variable TALLY_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token; falls back to environment variable RESTREAM_AUTH_TOKEN if not provided.
             as_dict: If True, return raw JSON dict instead of a model instance.
             **filters: Extra query parameters passed to the HTTP request.
 
@@ -167,7 +167,7 @@ class BaseInterface:
         """Fetch a collection of models from the API.
 
         Args:
-            auth_token: Optional auth token; falls back to environment variable TALLY_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token; falls back to environment variable RESTREAM_AUTH_TOKEN if not provided.
             as_dict: If True, return raw JSON list instead of model instances.
             **filters: Extra query parameters passed to the HTTP request.
 
@@ -185,7 +185,7 @@ class BaseInterface:
 
         Args:
             id: Identifier of the object to fetch.
-            auth_token: Optional auth token; falls back to environment variable TALLY_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token; falls back to environment variable RESTREAM_AUTH_TOKEN if not provided.
             as_dict: If True, return raw JSON dict instead of a model instance.
             **filters: Extra query parameters passed to the HTTP request.
 
@@ -202,7 +202,7 @@ class BaseInterface:
         """Asynchronously fetch a collection of models from the API.
 
         Args:
-            auth_token: Optional auth token; falls back to environment variable TALLY_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token; falls back to environment variable RESTREAM_AUTH_TOKEN if not provided.
             as_dict: If True, return raw JSON list instead of model instances.
             **filters: Extra query parameters passed to the HTTP request.
 

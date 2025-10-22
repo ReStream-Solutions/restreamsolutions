@@ -71,7 +71,7 @@ class State(BaseInterface):
           - stage_name_filter (StageNameFilters | None): When provided, restricts results to
             states whose current_state matches the given stage name pattern (e.g., frac, wireline).
           - auth_token (str | None): Explicit auth token. If None, the SDK will attempt to use
-            TALLY_AUTH_TOKEN environment variable.
+            RESTREAM_AUTH_TOKEN environment variable.
           - as_dict (bool): If True, return a list of plain dictionaries instead of State instances.
           - **filters: Additional server-side filters (e.g., pad__id, site__id) passed through
             to the HTTP request and supported by the API.
@@ -101,7 +101,7 @@ class State(BaseInterface):
           - stage_name_filter (StageNameFilters | None): When provided, restricts results to
             states whose current_state matches the given stage name pattern (e.g., frac, wireline).
           - auth_token (str | None): Explicit auth token. If None, the SDK will attempt to use
-            TALLY_AUTH_TOKEN environment variable.
+            RESTREAM_AUTH_TOKEN environment variable.
           - as_dict (bool): If True, return a list of plain dictionaries instead of State instances.
           - **filters: Additional server-side filters (e.g., pad__id, site__id) passed through
             to the HTTP request and supported by the API.

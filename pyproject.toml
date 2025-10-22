@@ -5,7 +5,7 @@ skip-string-normalization = 1
 [tool.poetry]
 name = "datastore-sdk"
 version = "0.1.0"
-description = "Tally's Datastore SDK"
+description = "ReStream Datastore SDK"
 authors = ["Riley Seaman <rileyseaman.com>", "Steven Brotherton <sbrotherton@restreamsolutions.com>", "Artem Prokopenko <aprokopenko@restreamsolutions.com>"]
 license = "MIT"
 readme = "README.md"

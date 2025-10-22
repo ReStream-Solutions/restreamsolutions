@@ -1,6 +1,6 @@
-# Datastore SDK
+# ReStream Datastore SDK
 
-This project provides a convenient Python SDK for interacting with the Tally Restream API. Using this SDK, you can:
+This project provides a convenient Python SDK for interacting with the Restream API. Using this SDK, you can:
 - check the configuration of your Sites and Pads and receive updates in real time
 - get information about the current and historical stages of the Sites with additional aggregated metrics
 - retrieve raw or sampled data from your Sites and Pads
@@ -37,14 +37,14 @@ poetry install
 
 ## Setup
 
-Set the environment variable TALLY_AUTH_TOKEN and assign it your authorization token obtained from Tally.
+Set the environment variable RESTREAM_AUTH_TOKEN and assign it your authorization token obtained from ReStream.
 Alternatively, you can skip setting the environment variable and pass the authorization token directly to the 
 SDK classes and methods.
 
 ```python
 import os
 from datastore_sdk import Pad
-os.environ["TALLY_AUTH_TOKEN"] = "your token"
+os.environ["RESTREAM_AUTH_TOKEN"] = "your token"
 pads = Pad.get_models()
 # Or provide auth token directly to the method
 pads = Pad.get_models(auth_token="your token")
