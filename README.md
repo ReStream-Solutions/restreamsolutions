@@ -340,8 +340,7 @@ from datastore_sdk import Pad, StageNameFilters
 pad = Pad(id=681)
 
 data_obj = pad.get_data(
-    start_datetime=datetime(2025, 9, 9, tzinfo=timezone.utc),
-    end_datetime=datetime(2025, 9, 9, minute=1, tzinfo=timezone.utc),
+    stage_number=1,
     is_routed=True,
     stage_name_filter=StageNameFilters.FRAC
 )
