@@ -65,6 +65,70 @@ class Site(BasePadSite):
     current_stage_number: int
     current_state: str
 
+    @classmethod
+    def get_models(
+        cls,
+        auth_token: str = None,
+        as_dict=False,
+        complete: bool | None = None,
+        pad_pk: int | None = None,
+        **filters,
+    ) -> "list[Site] | list[dict]":
+        """Fetch Site objects from the API.
+
+        Parameters:
+            auth_token (str | None): Optional auth token; falls back to environment variable
+             RESTREAM_AUTH_TOKEN if not provided.
+            as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
+            complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
+            pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
+            **filters: Additional query parameters supported by the API.
+
+        Returns:
+            list[Site] | list[dict]: A list of Site objects (or dicts when as_dict=True).
+
+        Raises:
+            AuthError: If authentication fails.
+            APICompatibilityError: If the endpoint is unavailable or the response format is not supported by
+                the current version of this package.
+            APIConcurrencyLimitError: If the API rate limit is reached.
+            HTTPError: For other non-2xx HTTP responses.
+        """
+        return super().get_models(auth_token=auth_token, as_dict=as_dict, complete=complete, pad_pk=pad_pk, **filters)
+
+    @classmethod
+    async def aget_models(
+        cls,
+        auth_token: str = None,
+        as_dict=False,
+        complete: bool | None = None,
+        pad_pk: int | None = None,
+        **filters,
+    ) -> "list[Site] | list[dict]":
+        """Asynchronously fetch Site objects from the API.
+
+        Parameters:
+            auth_token (str | None): Optional auth token; falls back to environment variable
+             RESTREAM_AUTH_TOKEN if not provided.
+            as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
+            complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
+            pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
+            **filters: Additional query parameters supported by the API.
+
+        Returns:
+            list[Site] | list[dict]: A list of Site objects (or dicts when as_dict=True).
+
+        Raises:
+            AuthError: If authentication fails.
+            APICompatibilityError: If the endpoint is unavailable or the response format is not supported by
+                the current version of this package.
+            APIConcurrencyLimitError: If the API rate limit is reached.
+            HTTPError: For other non-2xx HTTP responses.
+        """
+        return await super().aget_models(
+            auth_token=auth_token, as_dict=as_dict, complete=complete, pad_pk=pad_pk, **filters
+        )
+
     def get_state(self, as_dict: bool = False) -> Optional['State'] | Optional[dict[str, Any]]:
         """Fetch the current State object for this site.
 
