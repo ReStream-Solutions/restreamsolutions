@@ -250,8 +250,10 @@ class Communicator:
             AuthError, APICompatibilityError, APIConcurrencyLimitError, HTTPError
         """
         headers = Communicator._create_headers(auth_token)
+        # In contrast to requests.get(), it doesn’t clean up the final URL from parameters whose values are None
+        params_cleaned = {k: v for k, v in params.items() if v is not None}
         async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.get(url, params=params, headers=headers)
+            response = await client.get(url, params=params_cleaned, headers=headers)
         Communicator._check_response_status_code(response)
         return response.json()
 
