@@ -165,8 +165,7 @@ class Data(BaseData):
         """Save all selected pad/site data to a JSON or CSV file.
 
         The method writes all selected pad/sites data either to a JSON file (as a single
-        JSON array of objects) or to a CSV file (with a header derived from the first
-        yielded item). Choose the output by providing a path with a .json or .csv extension.
+        JSON array of objects) or to a CSV file. Choose the output by providing a path with a .json or .csv extension.
 
         Parent directories are created if missing. If the target file
         exists and overwrite is False, a FileExistsError is raised. If any
@@ -301,8 +300,7 @@ class DataAsync(BaseData):
         """Asynchronously save all selected pad/site data to a JSON or CSV file.
 
         The method writes all selected pad/sites data either to a JSON file (as a single
-        JSON array of objects) or to a CSV file (with a header derived from the first
-        yielded item). Choose the output by providing a path with a .json or .csv extension.
+        JSON array of objects) or to a CSV file. Choose the output by providing a path with a .json or .csv extension.
 
         Parent directories are created if missing. If the target file
         exists and overwrite is False, a FileExistsError is raised. If any
