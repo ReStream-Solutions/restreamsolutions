@@ -68,7 +68,6 @@ class Pad(BasePadSite):
              RESTREAM_AUTH_TOKEN if not provided.
             as_dict (bool): When True, return plain dicts instead of Pad instances. Default False.
             complete (bool | None): Filter the received pads by the complete attribute. Defaults to None (no filtering).
-                If False, request the minimal representation. If None, use API default.
             well_api (str | None): Optional well API (well identifier) used to filter pads by the site with
             the provided well API.
             site_pk (int | None): Optional site primary key to filter pads by a specific site.
@@ -105,7 +104,6 @@ class Pad(BasePadSite):
              RESTREAM_AUTH_TOKEN if not provided.
             as_dict (bool): When True, return plain dicts instead of Pad instances. Default False.
             complete (bool | None): Filter the received pads by the complete attribute. Defaults to None (no filtering).
-                If False, request the minimal representation. If None, use API default.
             well_api (str | None): Optional well API (well identifier) used to filter pads by the site with
             the provided well API.
             site_pk (int | None): Optional site primary key to filter pads by a specific site.
@@ -142,7 +140,6 @@ class Pad(BasePadSite):
             APIConcurrencyLimitError: If the API rate limit is reached.
             HTTPError: For other non-2xx HTTP responses.
         """
-        from .site import Site
 
         auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
@@ -165,7 +162,6 @@ class Pad(BasePadSite):
             APIConcurrencyLimitError: If the API rate limit is reached.
             HTTPError: For other non-2xx HTTP responses.
         """
-        from .site import Site
 
         auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
