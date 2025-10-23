@@ -9,6 +9,12 @@ This project provides a convenient Python SDK for interacting with the Restream 
 
 ## Installation and Build
 
+Install from PyPI:
+
+```bash
+pip install restreamsolutions
+```
+
 Build a wheel package from sources:
 
 ```bash

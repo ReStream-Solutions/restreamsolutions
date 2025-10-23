@@ -40,7 +40,7 @@ classifiers = [
 [project.urls]
 Homepage = "https://restreamsolutions.com/"
 Repository = "https://github.com/ReStream-Solutions/restreamsolutions"
-Changelog = "https://github.com/ReStream-Solutions/restreamsolutions/blob/master/CHANGELOG.md"
+Changelog = "https://github.com/ReStream-Solutions/restreamsolutions/blob/main/CHANGELOG.md"
 
 [tool.black]
 line-length = 120
