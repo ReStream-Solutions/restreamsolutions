@@ -321,7 +321,8 @@ class Communicator:
         Raises:
             AuthError, APICompatibilityError, APIConcurrencyLimitError, HTTPError
         """
-        headers = Communicator._create_headers(auth_token)
+        steaming_header = {'Prefer': 'streaming'}
+        headers = Communicator._create_headers(auth_token, additional_headers=[steaming_header])
         with requests.get(url, params=params, headers=headers, stream=True, timeout=(5, None)) as stream:
             Communicator._check_response_status_code(stream)
             stream.raw.decode_content = True
