@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import Optional, Any, Tuple
 
-from datastore_sdk.base_pad_site import BasePadSite
-from datastore_sdk.constants import ENDPOINTS, StageNameFilters, DataResolutions, DataAggregations, DataFillMethods
-from datastore_sdk.data_object import Data, DataAsync
-from datastore_sdk.exceptions import APICompatibilityError
+from restreamsolutions.base_pad_site import BasePadSite
+from restreamsolutions.constants import ENDPOINTS, StageNameFilters, DataResolutions, DataAggregations, DataFillMethods
+from restreamsolutions.data_object import Data, DataAsync
+from restreamsolutions.exceptions import APICompatibilityError
 
 
 class Site(BasePadSite):

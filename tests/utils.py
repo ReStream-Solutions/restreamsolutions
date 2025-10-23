@@ -1,4 +1,4 @@
-from datastore_sdk.base_interface import BaseInterface
+from restreamsolutions.base_interface import BaseInterface
 
 
 def check_instance_types(obj: BaseInterface):

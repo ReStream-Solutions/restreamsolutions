@@ -19,13 +19,13 @@ Build a wheel package from sources:
 
 Where to find the .whl file:
 - After running the script, the built artifact will be in the `dist/` directory.
-- The name will look like: `datastore_sdk-<version>-py3-none-any.whl`.
+- The name will look like: `restreamsolutions-<version>-py3-none-any.whl`.
 
 Use in another project (local installation from the .whl file):
 
 ```bash
 # From the other project's directory
-pip install /full/path/to/restream_datastore_sdk-<version>-py3-none-any.whl
+pip install /full/path/to/restreamsolutions-<version>-py3-none-any.whl
 ```
 
 Install for local development from sources (optional):
@@ -43,7 +43,8 @@ SDK classes and methods.
 
 ```python
 import os
-from datastore_sdk import Pad
+from restreamsolutions import Pad
+
 os.environ["RESTREAM_AUTH_TOKEN"] = "your token"
 pads = Pad.get_models()
 # Or provide auth token directly to the method
@@ -67,7 +68,8 @@ response become attributes of the class. Fields containing timestamps are automa
 Python `datetime` objects.
 
 ```python
-from datastore_sdk import Pad, Site
+from restreamsolutions import Pad, Site
+
 # Get a list of all pads as Pad objects
 pads = Pad.get_models()
 for pad in pads:
@@ -82,7 +84,8 @@ setting `as_dict=True`.
 
 ```python
 # Get a list of all pads as dicts
-from datastore_sdk import Pad, Site
+from restreamsolutions import Pad, Site
+
 pads_as_dict = Pad.get_models(as_dict=True)
 for pad in pads_as_dict:
     print(f'pad id: {pad["id"]}, pad name: {pad["name"]}, simops config: {pad["simops_config"]}')
@@ -96,7 +99,8 @@ sites_as_dict = Site.get_models(as_dict=True)
 If you know the ID of a `Site` or `Pad`, you can fetch a specific object using the `get_model` class method.
 
 ```python
-from datastore_sdk import Pad, Site
+from restreamsolutions import Pad, Site
+
 # Get a specific Pad object by its ID
 pad = Pad.get_model(id=668)
 
@@ -114,7 +118,8 @@ You can instantiate a class object directly from a dictionary. The class constru
 perform conversions, such as turning date strings into `datetime` objects.
 
 ```python
-from datastore_sdk import Site
+from restreamsolutions import Site
+
 site_as_dict = Site.get_model(id=981, as_dict=True)
 site = Site(**site_as_dict)
 print(f'date as datetime: {site.date_created}')
@@ -129,7 +134,8 @@ To get all `Sites` belonging to a `Pad`, you can use the `get_sites()` method. F
 instantiate the `Pad` with just its ID and then call the method.
 
 ```python
-from datastore_sdk import Pad
+from restreamsolutions import Pad
+
 # This approach makes two API calls: one to get the Pad, another to get its Sites.
 sites_v1 = Pad.get_model(id=668).get_sites()
 
@@ -141,7 +147,8 @@ When you create an object with only an `id`, it won't have other attributes popu
 methods to fetch related data. To load the object's own attributes, use the `update()` or `aupdate()` (async) method.
 
 ```python
-from datastore_sdk import Pad
+from restreamsolutions import Pad
+
 pad = Pad(id=668)
 print(f"The API call to get the pad has not been made yet. Pad name: {getattr(pad, 'name', None)}")
 
@@ -159,7 +166,8 @@ print(f"The update() method made an API call and loaded all attributes. Pad name
 To get the parent `Pad` for a `Site`, use the `get_pad()` instance method. The `as_dict` parameter is also available.
 
 ```python
-from datastore_sdk import Site
+from restreamsolutions import Site
+
 pad = Site(id=981).get_pad()
 pad_as_dict = Site(id=981).get_pad(as_dict=True)
 ```
@@ -172,7 +180,8 @@ To get the current configuration of a specific site or all sites on a pad, use t
 and `get_states()` methods.
 
 ```python
-from datastore_sdk import Site, Pad
+from restreamsolutions import Site, Pad
+
 pad = Pad(id=681)
 site = Site(id=981)
 
@@ -192,7 +201,8 @@ pad_states_json = pad.get_states(as_dict=True)
 You can filter the State objects by stage name using `StageNameFilters`.
 
 ```python
-from datastore_sdk import Pad, StageNameFilters
+from restreamsolutions import Pad, StageNameFilters
+
 pad = Pad(id=668)
 frac_states = pad.get_states(stage_name_filter=StageNameFilters.FRAC)
 ```
@@ -204,7 +214,8 @@ However, there's a better approach — see the “Real-time Sites and Pads updat
 
 ```python
 import time
-from datastore_sdk import Site, StageNameFilters
+from restreamsolutions import Site, StageNameFilters
+
 state = Site(id=981).get_state()
 if state:
     for _ in range(3):
@@ -222,7 +233,8 @@ previous stages with optional filters.
 
 ```python
 from datetime import datetime, timezone
-from datastore_sdk import Site, StageNameFilters
+from restreamsolutions import Site, StageNameFilters
+
 site = Site(id=1113)
 start_date = datetime(2025, 10, 1, 0, 0, 0, tzinfo=timezone.utc)
 end_date = datetime(2025, 10, 18, 0, 0, 0, tzinfo=timezone.utc)
@@ -240,7 +252,8 @@ You can also include aggregated metrics for each stage by setting `add_aggregati
 
 ```python
 from datetime import datetime, timezone
-from datastore_sdk import Site, StageNameFilters
+from restreamsolutions import Site, StageNameFilters
+
 site = Site(id=1113)
 start_date = datetime(2025, 9, 17, 0, 0, 0, tzinfo=timezone.utc)
 end_date = datetime(2025, 9, 18, 0, 0, 0, tzinfo=timezone.utc)
@@ -261,7 +274,8 @@ for stage in stages_with_aggregations[:3]:
 Retrieve metadata about measurement sources for an entire pad or a specific site.
 
 ```python
-from datastore_sdk import Pad, Site
+from restreamsolutions import Pad, Site
+
 # For an entire pad
 measurement_sources = Pad(id=681).get_measurement_sources_metadata()
 print(f'Pad measurement sources: {measurement_sources}')
@@ -277,7 +291,8 @@ print(f'Site measurement sources: {measurement_sources}')
 Get a list of available data field names for a pad or site. These names can be used to filter data retrieval.
 
 ```python
-from datastore_sdk import Pad, Site
+from restreamsolutions import Pad, Site
+
 pad = Pad(id=681)
 pad_fields = pad.get_fields_metadata()
 print(f'Pad fields: {pad_fields}')
@@ -297,7 +312,8 @@ sites (`True`) or returned for the entire pad (`False`). See the `get_data()` do
 
 ```python
 from datetime import datetime, timezone
-from datastore_sdk import Pad, StageNameFilters
+from restreamsolutions import Pad, StageNameFilters
+
 pad = Pad(id=681)
 
 data_obj = pad.get_data(
@@ -315,7 +331,8 @@ allowing you to process it immediately without waiting for the full download.
 
 ```python
 from datetime import datetime, timezone
-from datastore_sdk import Pad, StageNameFilters
+from restreamsolutions import Pad, StageNameFilters
+
 pad = Pad(id=681)
 
 data_obj = pad.get_data(
@@ -336,7 +353,8 @@ If `overwrite=False` (the default) and the file already exists, a `FileExistsErr
 
 ```python
 from datetime import datetime, timezone
-from datastore_sdk import Pad, StageNameFilters
+from restreamsolutions import Pad, StageNameFilters
+
 pad = Pad(id=681)
 
 data_obj = pad.get_data(
@@ -366,7 +384,8 @@ check for data changes, the ones already processed will be excluded. To do this,
 (or `aconfirm_data_received()` for the async version) on the `DataChange` objects you have handled.
 
 ```python
-from datastore_sdk import Pad
+from restreamsolutions import Pad
+
 pad = Pad(id=668)
 change_events, changed_data = pad.get_data_changes()
 
@@ -394,7 +413,8 @@ for event in change_events:
 You can also fetch the data for a single, specific change event.
 
 ```python
-from datastore_sdk import Pad
+from restreamsolutions import Pad
+
 pad = Pad(id=668)
 change_events, _ = pad.get_data_changes()
 
@@ -436,7 +456,7 @@ changed data itself. To load the actual records, use the `Data`/`DataAsync` obje
 `Data`/`DataAsync` from which you can iterate over the affected records or save them to a file.
 
 ```python
-from datastore_sdk import Pad
+from restreamsolutions import Pad
 
 pad = Pad(id=681)
 updates = pad.get_realtime_data_changes_updates()
@@ -452,7 +472,7 @@ The method returns a lazy `Data`/`DataAsync` object whose `data_fetcher` yields 
 Use `get_realtime_instance_updates()` and `aget_realtime_instance_updates()` methods of the `Pad` and `Site` classes.
 
 ```python
-from datastore_sdk import Pad
+from restreamsolutions import Pad
 
 pad = Pad(id=681)
 updates = pad.get_realtime_instance_updates()
@@ -483,7 +503,7 @@ first replay the historical data that matches those filters and then continue wi
 
 ```python
 from datetime import datetime, timezone
-from datastore_sdk import Pad, StageNameFilters
+from restreamsolutions import Pad, StageNameFilters
 
 pad = Pad(id=681)
 

@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Any
 
-from datastore_sdk import StageNameFilters
-from datastore_sdk.base_interface import BaseInterface
-from datastore_sdk.constants import ENDPOINTS
+from restreamsolutions import StageNameFilters
+from restreamsolutions.base_interface import BaseInterface
+from restreamsolutions.constants import ENDPOINTS
 
 
 class State(BaseInterface):

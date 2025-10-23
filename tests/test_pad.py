@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import pytest
 
-from datastore_sdk.constants import (
+from restreamsolutions.constants import (
     RESTREAM_HOST,
     ENDPOINTS,
     StageNameFilters,
@@ -14,10 +14,10 @@ from datastore_sdk.constants import (
     DataFillMethods,
 )
 
-from datastore_sdk.communicator import Communicator
-from datastore_sdk.pad import Pad
-from datastore_sdk.site import Site
-from datastore_sdk.state import State
+from restreamsolutions.communicator import Communicator
+from restreamsolutions.pad import Pad
+from restreamsolutions.site import Site
+from restreamsolutions.state import State
 from tests.utils import check_instance_types
 
 # Helpers

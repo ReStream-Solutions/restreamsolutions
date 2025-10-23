@@ -6,12 +6,12 @@ from typing import Any, Tuple
 
 from functools import partial
 
-from datastore_sdk import StageNameFilters
-from datastore_sdk.base_interface import BaseInterface
-from datastore_sdk.communicator import Communicator
-from datastore_sdk.constants import DataResolutions, DataAggregations, DataFillMethods
-from datastore_sdk.data_changes import DataChanges
-from datastore_sdk.data_object import Data, DataAsync
+from restreamsolutions import StageNameFilters
+from restreamsolutions.base_interface import BaseInterface
+from restreamsolutions.communicator import Communicator
+from restreamsolutions.constants import DataResolutions, DataAggregations, DataFillMethods
+from restreamsolutions.data_changes import DataChanges
+from restreamsolutions.data_object import Data, DataAsync
 
 
 class BasePadSite(BaseInterface):

@@ -1,28 +1,55 @@
+[project]
+name = "restreamsolutions"
+version = "0.1.0"
+description = "ReStream Datastore SDK"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10,<4.0"
+authors = [
+  { name = "Riley Seaman", email = "rseaman@restreamsolutions.com" },
+  { name = "Steven Brotherton", email = "sbrotherton@restreamsolutions.com" },
+  { name = "Artem Prokopenko", email = "aprokopenko@restreamsolutions.com" }
+]
+
+dependencies = [
+  "requests>=2.0.0",
+  "python-dateutil>=2.9.0",
+  "httpx>=0.27.0",
+  "ijson>=3.4.0",
+  "aiohttp>=3.13.1",
+  "aiofiles>=24.1.0",
+  "pandas>=2.0.0",
+  "websocket-client>=1.8.0",
+]
+
+keywords = ["datastore", "sdk", "restreamsolutions", "api"]
+classifiers = [
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Internet :: WWW/HTTP"
+]
+
+[project.urls]
+Homepage = "https://restreamsolutions.com/"
+Repository = "https://github.com/ReStream-Solutions/restreamsolutions"
+Changelog = "https://github.com/ReStream-Solutions/restreamsolutions/blob/master/CHANGELOG.md"
+
 [tool.black]
 line-length = 120
 skip-string-normalization = 1
 
 [tool.poetry]
-name = "datastore-sdk"
-version = "0.1.0"
-description = "ReStream Datastore SDK"
-authors = ["Riley Seaman <rseaman@restreamsolutions.com>", "Steven Brotherton <sbrotherton@restreamsolutions.com>", "Artem Prokopenko <aprokopenko@restreamsolutions.com>"]
-license = "MIT"
-readme = "README.md"
 packages = [
-  { include = "datastore_sdk" }
+  { include = "restreamsolutions" }
 ]
-
-[tool.poetry.dependencies]
-python = ">=3.10,<4.0"
-requests = ">=2.0.0"
-python-dateutil = ">=2.9.0"
-httpx = ">=0.27.0"
-ijson = ">=3.4.0"
-aiohttp = ">=3.13.1"
-aiofiles = ">=24.1.0"
-pandas = ">=2.0.0"
-websocket-client = ">=1.8.0"
 
 [tool.poetry.group.dev.dependencies]
 black = ">=25.0.0"
@@ -34,5 +61,5 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.8.0"]
 build-backend = "poetry.core.masonry.api"

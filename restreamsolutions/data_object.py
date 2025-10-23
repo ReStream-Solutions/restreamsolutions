@@ -8,7 +8,7 @@ from pathlib import Path
 import aiofiles
 import pandas as pd
 
-from datastore_sdk.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
+from restreamsolutions.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
 
 
 class BaseData:

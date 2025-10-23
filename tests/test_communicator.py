@@ -7,8 +7,8 @@ import pytest
 import requests
 import httpx
 
-from datastore_sdk.communicator import Communicator
-from datastore_sdk.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
+from restreamsolutions.communicator import Communicator
+from restreamsolutions.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
 
 
 # ------------------------
@@ -470,7 +470,7 @@ async def test_steaming_get_generator_async_error_mapping(monkeypatch):
 
 
 def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
-    import datastore_sdk.communicator as comm_module
+    import restreamsolutions.communicator as comm_module
 
     sent = []
     closed = {"flag": False}
@@ -525,7 +525,7 @@ def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
 
 
 def test_websocket_generator_stops_on_connection_closed(monkeypatch):
-    import datastore_sdk.communicator as comm_module
+    import restreamsolutions.communicator as comm_module
 
     class DummyWSClosed:
         def __init__(self, *args, **kwargs):
@@ -567,7 +567,7 @@ async def _collect_async_gen(gen):
 
 def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
     import aiohttp
-    import datastore_sdk.communicator as comm_module
+    import restreamsolutions.communicator as comm_module
 
     class DummyWS:
         def __init__(self, seq, on_send_json):
@@ -655,7 +655,7 @@ def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
 
 def test_websocket_generator_async_error_raises(monkeypatch):
     import aiohttp
-    import datastore_sdk.communicator as comm_module
+    import restreamsolutions.communicator as comm_module
 
     class DummyWS:
         def __init__(self, seq):

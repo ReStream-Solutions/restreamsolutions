@@ -3,10 +3,10 @@ from datetime import datetime
 from typing import Any
 from dateutil import parser
 
-from datastore_sdk.base_interface import BaseInterface
-from datastore_sdk.communicator import Communicator
-from datastore_sdk.constants import ENDPOINTS
-from datastore_sdk.exceptions import APICompatibilityError
+from restreamsolutions.base_interface import BaseInterface
+from restreamsolutions.communicator import Communicator
+from restreamsolutions.constants import ENDPOINTS
+from restreamsolutions.exceptions import APICompatibilityError
 from .data_object import Data, DataAsync
 
 
