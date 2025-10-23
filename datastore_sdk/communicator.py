@@ -459,6 +459,7 @@ class Communicator:
 
         timeout = aiohttp.ClientTimeout(total=None)
         async with aiohttp.ClientSession(timeout=timeout) as session:
+            ws = None
             try:
                 async with session.ws_connect(url, headers=headers, params=params) as ws:
                     i = 0
@@ -483,11 +484,18 @@ class Communicator:
                             else:
                                 yield data
                             if ack_message and (i % ack_after) == 0:
-                                await ws.send_json(ack_message)
+                                try:
+                                    await ws.send_json(ack_message)
+                                except Exception:
+                                    # If sending ACK fails (e.g., during shutdown), we just stop gracefully
+                                    break
                         elif msg.type == aiohttp.WSMsgType.BINARY:
                             yield msg.data
                             if ack_message and (i % ack_after) == 0:
-                                await ws.send_json(ack_message)
+                                try:
+                                    await ws.send_json(ack_message)
+                                except Exception:
+                                    break
                         elif msg.type in (
                             aiohttp.WSMsgType.CLOSE,
                             aiohttp.WSMsgType.CLOSING,
@@ -498,8 +506,18 @@ class Communicator:
                             raise WebsocketError()
                         # Ignore other control frames implicitly
 
+            except asyncio.CancelledError:
+                # Propagate cancellation after letting context managers attempt a clean shutdown
+                raise
             except WSServerHandshakeError as e:
                 Communicator._check_response_status_code(e)
 
             except (KeyError, ValueError) as e:
                 raise APICompatibilityError(f'Cannot parse WebSocket message: {repr(e)}')
+            finally:
+                # Ensure the websocket is closed if it was created
+                try:
+                    if ws is not None and not ws.closed:
+                        await ws.close(code=1000)
+                except Exception:
+                    pass

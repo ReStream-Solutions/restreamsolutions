@@ -254,6 +254,14 @@ class DataAsync(BaseData):
                     warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
                     await asyncio.sleep(1)
                     continue
+                finally:
+                    # Ensure the underlying async generator is properly closed when the
+                    # consumer stops iterating or when we plan to reconnect. This avoids
+                    # leaking aiohttp sessions/websockets and prevents 'Unclosed client session'.
+                    try:
+                        await agen.aclose()
+                    except Exception:
+                        pass
                 warnings.warn(f"The connection was closed. Reconnecting", RuntimeWarning)
 
         return _wrapper()
