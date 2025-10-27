@@ -2,7 +2,7 @@ import asyncio
 import json
 import time
 import warnings
-from typing import Generator, AsyncGenerator, Callable
+from typing import Generator, AsyncGenerator, Callable, Any
 from pathlib import Path
 
 import aiofiles
@@ -70,6 +70,8 @@ class Data(BaseData):
         data_generator_factory: Callable[[], Generator[dict, None, None]],
         restart_on_error: bool = False,
         restart_on_close: bool = False,
+        convert_to: Any = None,
+        auth_token: str = None,
     ) -> None:
         """Initialize the Data wrapper.
 
@@ -87,9 +89,25 @@ class Data(BaseData):
         self._data_generator_factory = data_generator_factory
         self._restart_on_error = restart_on_error
         self._restart_on_close = restart_on_close
+        self._convert_to = convert_to
+        self._auth_token = auth_token
 
     @property
     def data_fetcher(self) -> Generator[dict, None, None]:
+        """Return a fresh data generator that fetches data from the selected sites or pads.
+
+        The returned generator is a wrapper over the underlying generator from the
+        factory. If restart_on_error=True, it will recreate the underlying generator
+        when an exception occurs and continue yielding items. If restart_on_close=True,
+        it will also recreate the generator when it completes normally (e.g., clean WebSocket close)
+        and continue streaming.
+
+        Returns:
+            Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
+        """
+        return self._data_fetcher(convert_if_needed=True)
+
+    def _data_fetcher(self, convert_if_needed: bool = False) -> Generator[dict, None, None]:
         """Return a fresh data generator that fetches data from the selected sites or pads.
 
         The returned generator is a wrapper over the underlying generator from the
@@ -107,7 +125,10 @@ class Data(BaseData):
                 gen = self._data_generator_factory()
                 try:
                     for item in gen:
-                        yield item
+                        if self._convert_to and convert_if_needed:
+                            yield self._convert_to(**item, auth_token=self._auth_token)
+                        else:
+                            yield item
                     if not self._restart_on_close:
                         break  # normal completion
                 except (CredentialsError, APICompatibilityError, APIConcurrencyLimitError):
@@ -136,7 +157,7 @@ class Data(BaseData):
         try:
             with path.open("w", encoding='utf-8') as f:
                 f.write('[')
-                for i, item in enumerate(self.data_fetcher):
+                for i, item in enumerate(self._data_fetcher(convert_if_needed=False)):
                     if i > 0:
                         f.write(',\n')
                     f.write(json.dumps(item))
@@ -205,6 +226,8 @@ class DataAsync(BaseData):
         data_generator_factory: Callable[[], AsyncGenerator[dict, None]],
         restart_on_error: bool = False,
         restart_on_close: bool = False,
+        convert_to: Any = None,
+        auth_token: str = None,
     ) -> None:
         """Initialize the asynchronous Data wrapper.
 
@@ -222,9 +245,24 @@ class DataAsync(BaseData):
         self._data_generator_factory = data_generator_factory
         self._restart_on_error = restart_on_error
         self._restart_on_close = restart_on_close
+        self._convert_to = convert_to
+        self._auth_token = auth_token
 
     @property
     def data_fetcher(self) -> AsyncGenerator[dict, None]:
+        """Return a fresh  async data generator that fetches data from the selected sites or pads.
+
+        The returned async generator is a wrapper over the underlying generator from the
+        factory. If restart_on_error=True, it will recreate the underlying generator when
+        an exception occurs and continue yielding items. If restart_on_close=True, it will also
+        recreate the generator when it completes normally (e.g., clean WebSocket close) and continue streaming.
+
+        Returns:
+            Async Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
+        """
+        return self._data_fetcher(convert_if_needed=True)
+
+    def _data_fetcher(self, convert_if_needed: bool = False) -> AsyncGenerator[dict, None]:
         """Return a fresh  async data generator that fetches data from the selected sites or pads.
 
         The returned async generator is a wrapper over the underlying generator from the
@@ -241,7 +279,10 @@ class DataAsync(BaseData):
                 agen = self._data_generator_factory()
                 try:
                     async for item in agen:
-                        yield item
+                        if self._convert_to and convert_if_needed:
+                            yield self._convert_to(**item, auth_token=self._auth_token)
+                        else:
+                            yield item
                     if not self._restart_on_close:
                         break  # normal completion
                 except (CredentialsError, APICompatibilityError, APIConcurrencyLimitError):
@@ -278,7 +319,7 @@ class DataAsync(BaseData):
             async with aiofiles.open(path, 'w', encoding='utf-8') as f:
                 await f.write('[')
                 first = True
-                async for item in self.data_fetcher:
+                async for item in self._data_fetcher(convert_if_needed=False):
                     if not first:
                         await f.write(',\n')
                     await f.write(json.dumps(item))

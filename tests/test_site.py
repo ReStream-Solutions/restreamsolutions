@@ -415,7 +415,7 @@ def test_site_get_realtime_updates(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'websocket_generator', fake_ws)
 
-    data_obj = site.get_realtime_instance_updates(restart_on_close=False)
+    data_obj = site.get_realtime_instance_updates(restart_on_close=False, restart_on_error=False, as_dict=True)
     out = list(data_obj.data_fetcher)
     assert out == messages
 
@@ -441,7 +441,7 @@ async def test_site_aget_realtime_updates(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'websocket_generator_async', fake_ws_async)
 
-    data_async = await site.aget_realtime_instance_updates(restart_on_close=False)
+    data_async = await site.aget_realtime_instance_updates(restart_on_close=False, restart_on_error=False, as_dict=True)
     collected = []
     async for item in data_async.data_fetcher:
         collected.append(item)

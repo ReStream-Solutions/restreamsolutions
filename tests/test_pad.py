@@ -512,7 +512,7 @@ def test_pad_get_realtime_updates(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'websocket_generator', fake_ws)
 
-    data_obj = pad.get_realtime_instance_updates(restart_on_close=False)
+    data_obj = pad.get_realtime_instance_updates(restart_on_close=False, restart_on_error=False, as_dict=True)
     out = list(data_obj.data_fetcher)
     assert out == messages
 
@@ -538,7 +538,7 @@ async def test_pad_aget_realtime_updates(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'websocket_generator_async', fake_ws_async)
 
-    data_async = await pad.aget_realtime_instance_updates(restart_on_close=False)
+    data_async = await pad.aget_realtime_instance_updates(restart_on_close=False, restart_on_error=False, as_dict=True)
     collected = []
     async for item in data_async.data_fetcher:
         collected.append(item)
@@ -561,7 +561,7 @@ def test_pad_get_data_changes(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'send_get_request', fake_get)
 
-    changes, combined = pad.get_data_changes(as_dict=True, page=1)
+    changes, combined = pad.get_data_changes(as_dict=True)
     assert isinstance(changes, list)
     # combined should be a Data object with data_fetcher attribute
     assert hasattr(combined, 'data_fetcher')
