@@ -7,8 +7,8 @@ import pytest
 import requests
 import httpx
 
-from restreamsolutions.communicator import Communicator
-from restreamsolutions.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError
+from restreamsolutions.communicator import Communicator, Authorization
+from restreamsolutions.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError, ServerError
 
 
 # ------------------------
@@ -81,7 +81,7 @@ class DummyAsyncClient:
             raise RuntimeError("No get_cb provided for DummyAsyncClient")
         return await self._maybe_await(self._get_cb(u=u, params=params, headers=headers))
 
-    async def post(self, u, params=None, headers=None, json=None):
+    async def post(self, u, params=None, headers=None, json=None, data=None):
         if self._post_cb is None:
             raise RuntimeError("No post_cb provided for DummyAsyncClient")
         return await self._maybe_await(self._post_cb(u=u, params=params, headers=headers, json=json))
@@ -207,7 +207,7 @@ def test_send_get_request_other_error(monkeypatch):
 
     monkeypatch.setattr(requests, "get", fake_get)
 
-    with pytest.raises(requests.HTTPError):
+    with pytest.raises(ServerError):
         Communicator.send_get_request("https://e", "tok")
 
 
@@ -232,7 +232,7 @@ def test_send_post_request_success(monkeypatch):
         ),
     )
 
-    out = Communicator.send_post_request(url, token, {"name": "Bob"})
+    out = Communicator.send_post_request(url, {"name": "Bob"}, token)
     assert out == payload
 
 
@@ -251,15 +251,15 @@ def test_send_post_request_error_mapping(monkeypatch):
 
         monkeypatch.setattr(requests, "post", fake_post, raising=True)
         with pytest.raises(exc):
-            Communicator.send_post_request("https://e", "tok", {})
+            Communicator.send_post_request("https://e", {}, "tok")
 
     # other error
     def fake_post_500(u, params=None, headers=None, json=None):
         return make_requests_response(500, {})
 
     monkeypatch.setattr(requests, "post", fake_post_500)
-    with pytest.raises(requests.HTTPError):
-        Communicator.send_post_request("https://e", "tok", {})
+    with pytest.raises(ServerError):
+        Communicator.send_post_request("https://e", {}, "tok")
 
 
 # ------------------------
@@ -301,7 +301,7 @@ async def test_send_get_request_async_error_mapping(monkeypatch):
         (403, AuthError),
         (404, APICompatibilityError),
         (429, APIConcurrencyLimitError),
-        (500, None),
+        (500, ServerError),
     ]:
         await run_status(status, exc)
 
@@ -316,7 +316,7 @@ async def test_send_post_request_async_success(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(post_cb=post_cb))
 
-    out = await Communicator.send_post_request_async("https://e", "t", {"n": 1})
+    out = await Communicator.send_post_request_async("https://e", {"n": 1}, "t")
     assert out == payload
 
 
@@ -329,17 +329,17 @@ async def test_send_post_request_async_error_mapping(monkeypatch):
         monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(post_cb=post_cb))
         if expected_exc is None:
             with pytest.raises(httpx.HTTPStatusError):
-                await Communicator.send_post_request_async("https://e", "t", {})
+                await Communicator.send_post_request_async("https://e", {}, "t")
         else:
             with pytest.raises(expected_exc):
-                await Communicator.send_post_request_async("https://e", "t", {})
+                await Communicator.send_post_request_async("https://e", {}, "t")
 
     for status, exc in [
         (401, AuthError),
         (403, AuthError),
         (404, APICompatibilityError),
         (429, APIConcurrencyLimitError),
-        (500, None),
+        (500, ServerError),
     ]:
         await run_status(status, exc)
 
@@ -403,7 +403,7 @@ def test_steaming_get_generator_error_mapping(monkeypatch):
         (403, AuthError),
         (404, APICompatibilityError),
         (429, APIConcurrencyLimitError),
-        (500, None),
+        (500, ServerError),
     ]:
         run_status(status, exc)
 
@@ -702,3 +702,214 @@ def test_websocket_generator_async_error_raises(monkeypatch):
                 pass
 
     asyncio.run(run())
+
+
+# --- Authorization tests ---
+
+
+def _reset_auth_singleton():
+    # Ensure the singleton internal state is clean for each test
+    auth = Authorization()
+    auth._restream_auth_token = None
+    auth._expires_in = 0
+    return auth
+
+
+def test_authorization_create_payload_from_params_and_env(monkeypatch):
+    _reset_auth_singleton()
+    # When params are provided, env is ignored
+    payload = Authorization()._create_payload(client_id='cid', client_secret='sec')
+    assert payload == {
+        'client_id': 'cid',
+        'client_secret': 'sec',
+        'grant_type': 'client_credentials',
+    }
+
+    # When params are missing, take from env
+    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ENV_ID')
+    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'ENV_SEC')
+    payload2 = Authorization()._create_payload()
+    assert payload2['client_id'] == 'ENV_ID'
+    assert payload2['client_secret'] == 'ENV_SEC'
+    assert payload2['grant_type'] == 'client_credentials'
+
+    # When nothing is provided, raise CredentialsError
+    monkeypatch.delenv('RESTREAM_CLIENT_ID', raising=False)
+    monkeypatch.delenv('RESTREAM_CLIENT_SECRET', raising=False)
+    from restreamsolutions.exceptions import CredentialsError
+
+    with pytest.raises(CredentialsError):
+        Authorization()._create_payload()
+
+
+def test_authorization_parse_response_success_and_errors():
+    _reset_auth_singleton()
+
+    class RespOK:
+        def json(self):
+            return {'access_token': 'tok', 'expires_in': 3600}
+
+    token, exp = Authorization()._parse_response(RespOK())
+    assert token == 'tok'
+    assert isinstance(exp, int) and exp == 3600
+
+    # Missing fields -> APICompatibilityError
+    class RespMissing:
+        def json(self):
+            return {'access_token': 'tok'}
+
+    with pytest.raises(APICompatibilityError):
+        Authorization()._parse_response(RespMissing())
+
+    # Invalid JSON -> ServerError
+    class RespInvalid:
+        def json(self):
+            # Simulate json parsing failure
+            raise json.JSONDecodeError('msg', 'doc', 0)
+
+    with pytest.raises(ServerError):
+        Authorization()._parse_response(RespInvalid())
+
+
+def test_authorization_build_auth_url_uses_env_host(monkeypatch):
+    _reset_auth_singleton()
+    base = 'https://example.com'
+    monkeypatch.setenv('RESTREAM_HOST', base)
+    expected = base.rstrip('/') + Authorization._api_url_auth
+    assert Authorization._build_auth_url() == expected
+
+
+def test_get_access_token_posts_and_returns_token(monkeypatch):
+    auth = _reset_auth_singleton()
+    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
+    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
+
+    called = {}
+
+    def fake_post(u, data=None, timeout=None):
+        called['url'] = u
+        called['data'] = dict(data) if data is not None else None
+        # Use helper to create a realistic Response
+        return make_requests_response(200, {'access_token': 'token', 'expires_in': 3600})
+
+    monkeypatch.setattr(requests, 'post', fake_post)
+
+    token = auth.get_access_token()
+    assert token == 'token'
+    assert 'url' in called and 'data' in called
+    assert called['data']['client_id'] == 'ID'
+    assert called['data']['client_secret'] == 'SECRET'
+    assert called['data']['grant_type'] == 'client_credentials'
+    assert isinstance(called['url'], str) and called['url'].endswith(Authorization._api_url_auth)
+
+
+def test_get_access_token_uses_cache_when_not_expired(monkeypatch):
+    auth = _reset_auth_singleton()
+    # Preload cache and set far future expiry so _need_request returns False
+    auth._restream_auth_token = 'CACHED'
+    auth._expires_in = 10**9  # far future
+
+    def fail_post(*args, **kwargs):
+        raise AssertionError('requests.post should not be called when cache is valid')
+
+    monkeypatch.setattr(requests, 'post', fail_post)
+
+    assert auth.get_access_token() == 'CACHED'
+
+
+def test_get_access_token_force_refresh(monkeypatch):
+    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
+    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
+    auth = _reset_auth_singleton()
+    # Preload cache that would otherwise be valid
+    auth._restream_auth_token = 'OLD'
+    auth._expires_in = 10**9
+
+    calls = {'n': 0}
+
+    def fake_post(u, data=None, timeout=None):
+        calls['n'] += 1
+        return make_requests_response(200, {'access_token': 'NEW', 'expires_in': 3600})
+
+    monkeypatch.setattr(requests, 'post', fake_post)
+
+    tok = auth.get_access_token(force=True)
+    assert tok == 'NEW'
+    assert calls['n'] == 1
+
+
+@pytest.mark.asyncio
+async def test_aget_access_token_posts_and_returns_token_async(monkeypatch):
+    auth = _reset_auth_singleton()
+    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
+    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return {'access_token': 'token', 'expires_in': 3600}
+
+        def raise_for_status(self):
+            return None
+
+    async def post_cb(u, data=None, **kwargs):
+        # Return our simple response object
+        return Resp()
+
+    # Reuse DummyAsyncClient defined above in this module
+    monkeypatch.setattr(httpx, 'AsyncClient', lambda *a, **k: DummyAsyncClient(get_cb=None, post_cb=post_cb))
+
+    token = await auth.aget_access_token()
+    assert token == 'token'
+
+
+@pytest.mark.asyncio
+async def test_aget_access_token_uses_cache_when_not_expired(monkeypatch):
+    auth = _reset_auth_singleton()
+    auth._restream_auth_token = 'token'
+    auth._expires_in = 10**9
+
+    class FailingAsyncClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            raise AssertionError('AsyncClient should not be entered when cache is valid')
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(httpx, 'AsyncClient', FailingAsyncClient)
+
+    assert await auth.aget_access_token() == 'token'
+
+
+@pytest.mark.asyncio
+async def test_aget_access_token_force_refresh(monkeypatch):
+    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
+    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
+    auth = _reset_auth_singleton()
+    auth._restream_auth_token = 'OLD'
+    auth._expires_in = 10**9
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return {'access_token': 'NEW', 'expires_in': 3600}
+
+        def raise_for_status(self):
+            return None
+
+    calls = {'n': 0}
+
+    async def post_cb(u, data=None, **kwargs):
+        calls['n'] += 1
+        return Resp()
+
+    monkeypatch.setattr(httpx, 'AsyncClient', lambda *a, **k: DummyAsyncClient(get_cb=None, post_cb=post_cb))
+
+    tok = await auth.aget_access_token(force=True)
+    assert tok == 'NEW'
+    assert calls['n'] == 1

@@ -89,16 +89,10 @@ class DataChanges(BaseInterface):
         """
         raise NotImplementedError()
 
-    def _select_token_and_url(self) -> tuple[str, str]:
-        """Select the auth token and build the endpoint URL for this instance.
-
-        Returns:
-            tuple[str, str]: A pair of (auth_token, url) targeting the change-log
-            endpoint for the current site.
-        """
-        current_auth_token = self._select_token(self._auth_token)
+    def _build_url(self) -> str:
+        """Builds an endpoint URL for this instance."""
         url = self._format_url(self._api_url_multiple_objects, parent_id=self.site)
-        return current_auth_token, url
+        return url
 
     def _update_self_state(self, response_data: dict[str, Any]) -> None:
         """Update internal fields from a server response payload.
@@ -140,8 +134,8 @@ class DataChanges(BaseInterface):
         the server response. Sets update_received to True if the data-change
         event associated with the instance has already been confirmed.
         """
-        current_auth_token, url = self._select_token_and_url()
-        response_data = Communicator.send_get_request(url, current_auth_token)
+        url = self._build_url()
+        response_data = Communicator.send_get_request(url, self._auth_token)
         self._update_self_state(response_data)
 
     async def aupdate(self):
@@ -151,8 +145,8 @@ class DataChanges(BaseInterface):
         the server response. Sets update_received to True if the data-change
         event associated with the instance has already been confirmed.
         """
-        current_auth_token, url = self._select_token_and_url()
-        response_data = await Communicator.send_get_request_async(url, current_auth_token)
+        url = self._build_url()
+        response_data = await Communicator.send_get_request_async(url, self._auth_token)
         self._update_self_state(response_data)
 
     def get_data(self) -> 'Data':
@@ -170,7 +164,7 @@ class DataChanges(BaseInterface):
         """
         from .site import Site
 
-        site = Site(self.site)
+        site = Site(self.site, auth_token=self._auth_token)
         return site.get_data(start_datetime=self.start_date, end_datetime=self.end_date)
 
     async def aget_data(self) -> 'DataAsync':
@@ -188,7 +182,7 @@ class DataChanges(BaseInterface):
         """
         from .site import Site
 
-        site = Site(self.site)
+        site = Site(self.site, auth_token=self._auth_token)
         return await site.aget_data(start_datetime=self.start_date, end_datetime=self.end_date)
 
     def _create_confirm_data_received_payload(self):
@@ -215,8 +209,8 @@ class DataChanges(BaseInterface):
             warnings.warn(f"{str(self)} - confirmation has already been received.")
             return True
         payload = self._create_confirm_data_received_payload()
-        current_auth_token, url = self._select_token_and_url()
-        response_data = Communicator.send_post_request(url, current_auth_token, payload)
+        url = self._build_url()
+        response_data = Communicator.send_post_request(url, payload, self._auth_token)
         self._update_self_state(response_data)
         return self.update_received
 
@@ -235,8 +229,8 @@ class DataChanges(BaseInterface):
             warnings.warn(f"{str(self)} - confirmation has already been received.")
             return True
         payload = self._create_confirm_data_received_payload()
-        current_auth_token, url = self._select_token_and_url()
-        response_data = await Communicator.send_post_request_async(url, current_auth_token, payload)
+        url = self._build_url()
+        response_data = await Communicator.send_post_request_async(url, payload, self._auth_token)
         self._update_self_state(response_data)
         return self.update_received
 
@@ -294,7 +288,8 @@ class DataChanges(BaseInterface):
 
         Args:
             raw_changes: Raw change entries from the API change log.
-            auth_token: Token to authenticate downstream data requests.
+            auth_token: Optional auth token for downstream data requests; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
 
         Returns:
             Data: A lazy iterable over all affected data across sites/intervals.
@@ -322,7 +317,8 @@ class DataChanges(BaseInterface):
 
         Args:
             raw_changes: Raw change entries from the API change log.
-            auth_token: Token to authenticate downstream data requests.
+            auth_token: Optional auth token for downstream data requests; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
 
         Returns:
             DataAsync: A lazy async iterable over all affected data across sites/intervals.

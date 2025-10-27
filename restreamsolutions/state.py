@@ -70,8 +70,8 @@ class State(BaseInterface):
         Parameters:
           - stage_name_filter (StageNameFilters | None): When provided, restricts results to
             states whose current_state matches the given stage name pattern (e.g., frac, wireline).
-          - auth_token (str | None): Explicit auth token. If None, the SDK will attempt to use
-            RESTREAM_AUTH_TOKEN environment variable.
+          - auth_token: Optional auth token used for API requests; if not provided,
+             RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
           - as_dict (bool): If True, return a list of plain dictionaries instead of State instances.
           - **filters: Additional server-side filters (e.g., pad__id, site__id) passed through
             to the HTTP request and supported by the API.

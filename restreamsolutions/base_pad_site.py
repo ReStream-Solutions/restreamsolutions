@@ -84,9 +84,8 @@ class BasePadSite(BaseInterface):
         Returns:
             A list of metadata dictionaries for available fields.
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_fields_metadata, id=self.id)
-        return Communicator.send_get_request(url, auth_token, **filters)
+        return Communicator.send_get_request(url, self._auth_token, **filters)
 
     async def aget_fields_metadata(self, **filters) -> list[dict[str, Any]]:
         """Asynchronously fetch all available data fields names and their metadata related
@@ -98,9 +97,8 @@ class BasePadSite(BaseInterface):
         Returns:
             A list of metadata dictionaries for available fields.
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_fields_metadata, id=self.id)
-        return await Communicator.send_get_request_async(url, auth_token, **filters)
+        return await Communicator.send_get_request_async(url, self._auth_token, **filters)
 
     def get_stages_metadata(
         self,
@@ -125,13 +123,12 @@ class BasePadSite(BaseInterface):
             A list of dictionaries describing stages. If add_aggregations=True, each item may
             include an "aggregations" key with aggregation details (or None if unavailable).
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_stages_metadata, id=self.id)
         filters = self._mix_stage_metadata_filters(start, end, stage_number, stage_name_filter, **filters)
-        stages_metadata = Communicator.send_get_request(url, auth_token, **filters)
+        stages_metadata = Communicator.send_get_request(url, self._auth_token, **filters)
 
         if add_aggregations:
-            stages_metadata = self._add_aggregations(stages_metadata, auth_token)
+            stages_metadata = self._add_aggregations(stages_metadata, self._auth_token)
 
         return stages_metadata
 
@@ -159,13 +156,12 @@ class BasePadSite(BaseInterface):
             A list of dictionaries describing stages. If add_aggregations=True, each item may
             include an "aggregations" key with aggregation details (or None if unavailable).
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_stages_metadata, id=self.id)
         filters = self._mix_stage_metadata_filters(start, end, stage_number, stage_name_filter, **filters)
-        stages_metadata = await Communicator.send_get_request_async(url, auth_token, **filters)
+        stages_metadata = await Communicator.send_get_request_async(url, self._auth_token, **filters)
 
         if add_aggregations:
-            stages_metadata = await self._add_aggregations_async(stages_metadata, auth_token)
+            stages_metadata = await self._add_aggregations_async(stages_metadata, self._auth_token)
 
         return stages_metadata
 
@@ -201,12 +197,12 @@ class BasePadSite(BaseInterface):
                 stage_metadata['aggregations'] = None
         return stages_metadata
 
-    def _add_aggregations(self, stages_metadata: list[dict[str, Any]], auth_token: str) -> list[dict[str, Any]]:
+    def _add_aggregations(self, stages_metadata: list[dict[str, Any]], auth_token: str = None) -> list[dict[str, Any]]:
         """Fetch and attach aggregations to the provided historic stages list.
 
         Parameters:
             stages_metadata: List of historic stage dicts obtained from get_stages_metadata.
-            auth_token: Authorization token.
+            auth_token: Authorization token (Optional).
 
         Returns:
             The same list enriched with an 'aggregations' key for each stage.
@@ -220,13 +216,13 @@ class BasePadSite(BaseInterface):
         return stages_metadata
 
     async def _add_aggregations_async(
-        self, stages_metadata: list[dict[str, Any]], auth_token: str
+        self, stages_metadata: list[dict[str, Any]], auth_token: str = None
     ) -> list[dict[str, Any]]:
         """Asynchronously fetch and attach aggregations to the provided historic stages list.
 
         Parameters:
             stages_metadata: List of historic stage dicts obtained from get_stages_metadata.
-            auth_token: Authorization token.
+            auth_token: Authorization token (Optional).
 
         Returns:
             The same list enriched with an 'aggregations' key for each stage.
@@ -282,10 +278,10 @@ class BasePadSite(BaseInterface):
                 fill_data_method is provided.
 
         Returns:
-            A dict of parameters ready to be passed into the Communicator requests.
+            A dict of parameters, ready to be passed into the Communicator requests.
 
         Raises:
-            ValueError: if provided datetimes are not timezone-aware, or if stage_number is
+            ValueError: if provided datetime objects are not timezone-aware, or if stage_number is
             provided without stage_name_filter.
         """
         start_datetime: datetime | None = filters.get('start_datetime')
@@ -378,10 +374,9 @@ class BasePadSite(BaseInterface):
         Returns:
             A Data object that lazily iterates over streamed records from the API.
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data, id=self.id)
         params = self._build_get_data_params(**filters)
-        data_generator_factory = lambda: Communicator.steaming_get_generator(url, auth_token, **params)
+        data_generator_factory = lambda: Communicator.steaming_get_generator(url, self._auth_token, **params)
         return Data(data_generator_factory)
 
     async def aget_data(self, **filters: dict) -> DataAsync:
@@ -393,10 +388,9 @@ class BasePadSite(BaseInterface):
         Returns:
             A DataAsync object that lazily iterates over streamed records from the API.
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data, id=self.id)
         params = self._build_get_data_params(**filters)
-        data_generator_factory = lambda: Communicator.steaming_get_generator_async(url, auth_token, **params)
+        data_generator_factory = lambda: Communicator.steaming_get_generator_async(url, self._auth_token, **params)
         return DataAsync(data_generator_factory)
 
     def get_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[list[dict | DataChanges], Data]:
@@ -412,18 +406,17 @@ class BasePadSite(BaseInterface):
               - changes_list is a list of dicts or DataChanges instances depending on as_dict.
               - combined_data is a Data object representing a concatenation of change intervals.
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
-        response = Communicator.send_get_request(url, auth_token, **filters)
+        response = Communicator.send_get_request(url, self._auth_token, **filters)
         raw_changes: list[dict[str, Any]] = response.get('change_log', [])
 
         changes_list = DataChanges._build_multiple_from_response(
             json_response=raw_changes,
-            auth_token=auth_token,
+            auth_token=self._auth_token,
             as_dict=as_dict,
         )
 
-        combined_data = DataChanges._build_combined_data_object(raw_changes, auth_token)
+        combined_data = DataChanges._build_combined_data_object(raw_changes, self._auth_token)
         return changes_list, combined_data
 
     async def aget_data_changes(
@@ -441,22 +434,21 @@ class BasePadSite(BaseInterface):
               - changes_list is a list of dicts or DataChanges instances depending on as_dict.
               - combined_data is a DataAsync object representing a concatenation of change intervals.
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
         # TODO: The response of this endpoint is of type "stream".
         # We need to fix handling streaming data in async mode.
         # In the meantime, we can use the synchronous method in a thread
-        sync_call = partial(Communicator.send_get_request, url, auth_token, **filters)
+        sync_call = partial(Communicator.send_get_request, url, self._auth_token, **filters)
         response = await asyncio.to_thread(sync_call)
         raw_changes: list[dict[str, Any]] = response.get('change_log', [])
 
         changes_list = DataChanges._build_multiple_from_response(
             json_response=raw_changes,
-            auth_token=auth_token,
+            auth_token=self._auth_token,
             as_dict=as_dict,
         )
 
-        combined_data_async = DataChanges._build_combined_data_async_object(raw_changes, auth_token)
+        combined_data_async = DataChanges._build_combined_data_async_object(raw_changes, self._auth_token)
         return changes_list, combined_data_async
 
     def _prepare_measurements_websocket_params(self, endpoint_url: str, session_key: str) -> dict[str, Any]:
@@ -469,7 +461,6 @@ class BasePadSite(BaseInterface):
         Returns:
             A dict with auth token, formatted URL, headers, ack message config, and the resolved session key.
         """
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
 
         if not session_key:
@@ -483,7 +474,7 @@ class BasePadSite(BaseInterface):
         get_nested_key = 'message'
 
         return {
-            'auth_token': auth_token,
+            'auth_token': self._auth_token,
             'url': url,
             'params': params,
             'ack_message': ack_message,
@@ -572,9 +563,8 @@ class BasePadSite(BaseInterface):
         restart_on_close: bool = True,
     ) -> Data:
         """Helper to build a Data object for a generic real-time WebSocket endpoint (sync)."""
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
-        data_generator_factory = lambda: Communicator.websocket_generator(url, auth_token=auth_token)
+        data_generator_factory = lambda: Communicator.websocket_generator(url, auth_token=self._auth_token)
         return Data(data_generator_factory, restart_on_error=restart_on_error, restart_on_close=restart_on_close)
 
     async def _aget_real_time_updates_object(
@@ -584,9 +574,8 @@ class BasePadSite(BaseInterface):
         restart_on_close: bool = True,
     ) -> DataAsync:
         """Helper to build a DataAsync for a generic real-time WebSocket endpoint (async)."""
-        auth_token = self._select_token(self._auth_token)
         url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
-        data_generator_factory = lambda: Communicator.websocket_generator_async(url, auth_token=auth_token)
+        data_generator_factory = lambda: Communicator.websocket_generator_async(url, auth_token=self._auth_token)
         return DataAsync(data_generator_factory, restart_on_error=restart_on_error, restart_on_close=restart_on_close)
 
     def get_realtime_instance_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:

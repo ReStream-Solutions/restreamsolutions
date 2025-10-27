@@ -16,6 +16,7 @@ class ENDPOINTS(Enum):
           working with nested resources like data changes.
     """
 
+    auth_access_token = '/o/token/'
     sites_one = '/external/thirdparty/v1/sites/{id}/'
     sites_many = '/external/thirdparty/v1/sites/'
     pads_one = '/external/thirdparty/v1/pads/{id}/'
