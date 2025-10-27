@@ -64,8 +64,8 @@ class Pad(BasePadSite):
         """Fetch Pad objects from the API.
 
         Parameters:
-            auth_token (str | None): Optional auth token; falls back to environment variable
-             RESTREAM_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token used for API requests; if not provided,
+             RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             as_dict (bool): When True, return plain dicts instead of Pad instances. Default False.
             complete (bool | None): Filter the received pads by the complete attribute. Defaults to None (no filtering).
             well_api (str | None): Optional well API (well identifier) used to filter pads by the site with
@@ -100,8 +100,8 @@ class Pad(BasePadSite):
         """Asynchronously fetch Pad objects from the API.
 
         Parameters:
-            auth_token (str | None): Optional auth token; falls back to environment variable
-             RESTREAM_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token used for API requests; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             as_dict (bool): When True, return plain dicts instead of Pad instances. Default False.
             complete (bool | None): Filter the received pads by the complete attribute. Defaults to None (no filtering).
             well_api (str | None): Optional well API (well identifier) used to filter pads by the site with
@@ -141,9 +141,8 @@ class Pad(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
 
-        auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
-        return Site.get_models(auth_token=auth_token, as_dict=as_dict, **final_filters)
+        return Site.get_models(auth_token=self._auth_token, as_dict=as_dict, **final_filters)
 
     async def aget_sites(self, as_dict=False, **filters) -> list['Site'] | list[dict[str, Any]]:
         """Asynchronously fetch all Site objects that belong to this Pad.
@@ -163,9 +162,8 @@ class Pad(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
 
-        auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
-        return await Site.aget_models(auth_token=auth_token, as_dict=as_dict, **final_filters)
+        return await Site.aget_models(auth_token=self._auth_token, as_dict=as_dict, **final_filters)
 
     def get_states(
         self, stage_name_filter: StageNameFilters = None, as_dict=False, **filters
@@ -190,10 +188,9 @@ class Pad(BasePadSite):
         """
         from .state import State
 
-        auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
         return State.get_models(
-            stage_name_filter=stage_name_filter, auth_token=auth_token, as_dict=as_dict, **final_filters
+            stage_name_filter=stage_name_filter, auth_token=self._auth_token, as_dict=as_dict, **final_filters
         )
 
     async def aget_states(
@@ -219,10 +216,9 @@ class Pad(BasePadSite):
         """
         from .state import State
 
-        auth_token = self._auth_token if self._auth_token else None
         final_filters = {**filters, 'pad__id': self.id}
         return await State.aget_models(
-            stage_name_filter=stage_name_filter, auth_token=auth_token, as_dict=as_dict, **final_filters
+            stage_name_filter=stage_name_filter, auth_token=self._auth_token, as_dict=as_dict, **final_filters
         )
 
     def _get_measurement_sources(self) -> dict:

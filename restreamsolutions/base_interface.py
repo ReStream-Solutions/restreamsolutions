@@ -20,8 +20,8 @@ class BaseInterface:
 
         Args:
             id: Unique identifier of the model instance.
-            auth_token: Optional auth token used for API requests; if not provided, environment variable RESTREAM_AUTH_TOKEN
-            will be used instead.
+            auth_token: Optional auth token used for API requests; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             **kwargs: Additional fields which will be set as attributes of the instance with possible type conversions
             according to the type hints of the child class.
         """
@@ -76,21 +76,6 @@ class BaseInterface:
         if not isinstance(json_response, dict):
             raise APICompatibilityError(f"Expected a JSON object for a single model, but received: {json_response}")
         return cls(auth_token=auth_token, **{'id': id, **json_response})
-
-    @classmethod
-    def _select_token(cls, auth_token: str) -> str | None:
-        """Choose the authentication token to use for requests.
-
-        Prefers the explicitly provided token; falls back to the RESTREAM_AUTH_TOKEN
-        environment variable if not provided.
-
-        Args:
-            auth_token: Optional token passed directly to the call.
-
-        Returns:
-            The selected token string or None if nothing is available.
-        """
-        return auth_token or os.environ.get("RESTREAM_AUTH_TOKEN")
 
     @classmethod
     def _build_multiple_from_response(cls, json_response, auth_token: str, as_dict: bool):
@@ -150,16 +135,16 @@ class BaseInterface:
 
         Args:
             id: Identifier of the object to fetch.
-            auth_token: Optional auth token; falls back to environment variable RESTREAM_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             as_dict: If True, return raw JSON dict instead of a model instance.
             **filters: Extra query parameters passed to the HTTP request.
 
         Returns:
             An instance of the current class or a raw dict if as_dict is True.
         """
-        current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_single_object, id=id)
-        json_response = Communicator.send_get_request(url, current_auth_token, **filters)
+        json_response = Communicator.send_get_request(url, auth_token, **filters)
         return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
@@ -167,16 +152,16 @@ class BaseInterface:
         """Fetch a collection of models from the API.
 
         Args:
-            auth_token: Optional auth token; falls back to environment variable RESTREAM_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             as_dict: If True, return raw JSON list instead of model instances.
             **filters: Extra query parameters passed to the HTTP request.
 
         Returns:
             A list of class instances or a raw list of dicts if as_dict is True.
         """
-        current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_multiple_objects)
-        json_response = Communicator.send_get_request(url, current_auth_token, **filters)
+        json_response = Communicator.send_get_request(url, auth_token, **filters)
         return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
@@ -185,16 +170,16 @@ class BaseInterface:
 
         Args:
             id: Identifier of the object to fetch.
-            auth_token: Optional auth token; falls back to environment variable RESTREAM_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             as_dict: If True, return raw JSON dict instead of a model instance.
             **filters: Extra query parameters passed to the HTTP request.
 
         Returns:
             An instance of the current class or a raw dict if as_dict is True.
         """
-        current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_single_object, id=id)
-        json_response = await Communicator.send_get_request_async(url, current_auth_token, **filters)
+        json_response = await Communicator.send_get_request_async(url, auth_token, **filters)
         return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
@@ -202,16 +187,16 @@ class BaseInterface:
         """Asynchronously fetch a collection of models from the API.
 
         Args:
-            auth_token: Optional auth token; falls back to environment variable RESTREAM_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             as_dict: If True, return raw JSON list instead of model instances.
             **filters: Extra query parameters passed to the HTTP request.
 
         Returns:
             A list of class instances or a raw list of dicts if as_dict is True.
         """
-        current_auth_token = cls._select_token(auth_token)
         url = cls._format_url(cls._api_url_multiple_objects)
-        json_response = await Communicator.send_get_request_async(url, current_auth_token, **filters)
+        json_response = await Communicator.send_get_request_async(url, auth_token, **filters)
         return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_dict=as_dict)
 
     def update(self):

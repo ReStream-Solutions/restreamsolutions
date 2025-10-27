@@ -43,25 +43,60 @@ poetry install
 
 ## Setup
 
-Set the environment variable RESTREAM_AUTH_TOKEN and assign it your authorization token obtained from ReStream.
-Alternatively, you can skip setting the environment variable and pass the authorization token directly to the 
-SDK classes and methods.
+Provide your ReStream OAuth2 client credentials via environment variables RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET.
+The SDK will automatically request and cache an access token when needed.
+You can also pass an access token directly to the SDK classes and methods if you already have one.
 
 ```python
 import os
 from restreamsolutions import Pad
 
-os.environ["RESTREAM_AUTH_TOKEN"] = "your token"
+# Preferred: set client credentials as environment variables
+os.environ["RESTREAM_CLIENT_ID"] = "your_client_id"
+os.environ["RESTREAM_CLIENT_SECRET"] = "your_client_secret"
+
+# Now you can call SDK methods without passing a token — it will be obtained automatically
 pads = Pad.get_models()
-# Or provide auth token directly to the method
+
+# If you already have a token, you can still pass it directly to methods
 pads = Pad.get_models(auth_token="your token")
 ```
+
+## Using the Authorization class
+
+You can use the Authorization helper to request and cache an access token using your client credentials. This is useful when you need a token outside of the SDK calls (for example, to paste into Swagger UI or other tools).
+
+```python
+import os
+from restreamsolutions import Authorization, Pad, Site
+
+# Option 1: use environment variables (recommended)
+os.environ["RESTREAM_CLIENT_ID"] = "your_client_id"
+os.environ["RESTREAM_CLIENT_SECRET"] = "your_client_secret"
+
+# Get and cache an access token
+auth = Authorization()
+token = auth.get_access_token()
+
+# You can pass the token to SDK methods or constructors explicitly if you prefer
+pads = Pad.get_models(auth_token=token)
+site = Site(id=123, auth_token=token)
+states = site.get_states()
+
+# Option 2: provide credentials directly (overrides env vars)
+other_token = auth.get_access_token(client_id="id", client_secret="secret", force=True)
+
+# Force refresh the token when needed
+fresh_token = auth.get_access_token(force=True)
+```
+
+Note: If you set RESTREAM_CLIENT_ID/RESTREAM_CLIENT_SECRET, the SDK will obtain tokens automatically when you call methods. Passing auth_token directly remains fully supported in both class constructors and methods.
 
 ## Usage
 
 You will primarily interact with two classes, `Site` and `Pad`, which provide access to all the information available
-through the Restream API. Please set your authorization token at the very top of your code file, as shown above. 
-In the examples, this step is omitted for the sake of brevity.
+through the Restream API. Configure authentication as shown above (via RESTREAM_CLIENT_ID/RESTREAM_CLIENT_SECRET) or pass
+an access token directly to methods/constructors when needed. In the examples, this step is omitted for brevity.
 
 ### Fetching Sites and Pads
 

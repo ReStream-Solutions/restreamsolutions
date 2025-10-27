@@ -77,8 +77,8 @@ class Site(BasePadSite):
         """Fetch Site objects from the API.
 
         Parameters:
-            auth_token (str | None): Optional auth token; falls back to environment variable
-             RESTREAM_AUTH_TOKEN if not provided.
+            auth_token: Optional auth token used for API requests; if not provided,
+             RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
             complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
             pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
@@ -108,8 +108,8 @@ class Site(BasePadSite):
         """Asynchronously fetch Site objects from the API.
 
         Parameters:
-            auth_token (str | None): Optional auth token; falls back to environment variable
-             RESTREAM_AUTH_TOKEN if not provided.
+            auth_token (str | None): Optional auth token used for API requests; if not provided,
+             RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
             as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
             complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
             pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
@@ -148,8 +148,7 @@ class Site(BasePadSite):
         """
         from .state import State
 
-        auth_token = self._auth_token if self._auth_token else None
-        states = State.get_models(auth_token=auth_token, as_dict=as_dict, site__id=self.id)
+        states = State.get_models(auth_token=self._auth_token, as_dict=as_dict, site__id=self.id)
         if not states:
             return None
         return states[0]
@@ -173,8 +172,7 @@ class Site(BasePadSite):
         """
         from .state import State
 
-        auth_token = self._auth_token if self._auth_token else None
-        states = await State.aget_models(auth_token=auth_token, as_dict=as_dict, site__id=self.id)
+        states = await State.aget_models(auth_token=self._auth_token, as_dict=as_dict, site__id=self.id)
         if not states:
             return None
         return states[0]
@@ -201,8 +199,7 @@ class Site(BasePadSite):
             self.update()
         if getattr(self, 'pad_id') is None:
             return None
-        auth_token = self._auth_token if self._auth_token else None
-        return Pad.get_model(id=self.pad_id, auth_token=auth_token, as_dict=as_dict)
+        return Pad.get_model(id=self.pad_id, auth_token=self._auth_token, as_dict=as_dict)
 
     async def aget_pad(self, as_dict: bool = False) -> Optional['Pad'] | Optional[dict[str, Any]]:
         """Asynchronously fetch the parent Pad object this site belongs to.
@@ -226,8 +223,7 @@ class Site(BasePadSite):
             await self.aupdate()
         if getattr(self, 'pad_id') is None:
             return None
-        auth_token = self._auth_token if self._auth_token else None
-        return await Pad.aget_model(id=self.pad_id, auth_token=auth_token, as_dict=as_dict)
+        return await Pad.aget_model(id=self.pad_id, auth_token=self._auth_token, as_dict=as_dict)
 
     def _extract_site_measurement_sources(self, pad_measurement_sources: dict) -> dict:
         """Internal helper to filter pad measurement_sources to only those attached to this site.

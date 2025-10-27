@@ -5,6 +5,13 @@ class AuthError(Exception):
         super().__init__(message)
 
 
+class CredentialsError(Exception):
+    """Raised when Oauth2 credentials are not provided."""
+
+    def __init__(self, message: str = "Unauthorized: invalid or missing client_id and/or client_secret"):
+        super().__init__(message)
+
+
 class APICompatibilityError(Exception):
     """Raised when the SDK's expectations don't match the server API (schema/version mismatch)."""
 
@@ -25,4 +32,11 @@ class WebsocketError(Exception):
     """Raised when a websocket error occurs."""
 
     def __init__(self, message: str = "The websocket error occurs."):
+        super().__init__(message)
+
+
+class ServerError(Exception):
+    """Raised when a server error occurs."""
+
+    def __init__(self, message: str = "Server error occurred."):
         super().__init__(message)
