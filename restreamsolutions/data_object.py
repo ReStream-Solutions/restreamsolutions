@@ -126,7 +126,10 @@ class Data(BaseData):
                 try:
                     for item in gen:
                         if self._convert_to and convert_if_needed:
-                            yield self._convert_to(**item, auth_token=self._auth_token)
+                            try:
+                                yield self._convert_to(**item, auth_token=self._auth_token)
+                            except Exception:
+                                raise APICompatibilityError(f'Failed to convert {item} to {self._convert_to}')
                         else:
                             yield item
                     if not self._restart_on_close:
@@ -280,7 +283,10 @@ class DataAsync(BaseData):
                 try:
                     async for item in agen:
                         if self._convert_to and convert_if_needed:
-                            yield self._convert_to(**item, auth_token=self._auth_token)
+                            try:
+                                yield self._convert_to(**item, auth_token=self._auth_token)
+                            except Exception:
+                                raise APICompatibilityError(f'Failed to convert {item} to {self._convert_to}')
                         else:
                             yield item
                     if not self._restart_on_close:
