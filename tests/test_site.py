@@ -406,7 +406,7 @@ def test_site_get_realtime_updates(monkeypatch):
     url_http = f"{RESTREAM_HOST}{ENDPOINTS.site_updates_websocket.value}".format(id=site.id)
     url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
 
-    messages = [{'k1': 'v1'}, {'k2': 2}, {'k3': None}]
+    messages = [{'id': 101, 'k1': 'v1'}, {'id': 102, 'k2': 2}, {'id': 103, 'k3': None}]
 
     def fake_ws(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
         assert url_in == url_wss
@@ -415,9 +415,17 @@ def test_site_get_realtime_updates(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'websocket_generator', fake_ws)
 
-    data_obj = site.get_realtime_instance_updates(restart_on_close=False)
+    # as_dict=True
+    data_obj = site.get_realtime_instance_updates(restart_on_close=False, restart_on_error=False, as_dict=True)
     out = list(data_obj.data_fetcher)
     assert out == messages
+
+    # as_dict=False -> Site instances with propagated _auth_token
+    data_obj2 = site.get_realtime_instance_updates(restart_on_close=False, restart_on_error=False, as_dict=False)
+    out2 = list(data_obj2.data_fetcher)
+    assert all(isinstance(it, Site) for it in out2)
+    assert [it.id for it in out2] == [m['id'] for m in messages]
+    assert all(getattr(it, '_auth_token') == token for it in out2)
 
 
 @pytest.mark.asyncio
@@ -427,7 +435,7 @@ async def test_site_aget_realtime_updates(monkeypatch):
     url_http = f"{RESTREAM_HOST}{ENDPOINTS.site_updates_websocket.value}".format(id=site.id)
     url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
 
-    messages = [{'k1': 'v1'}, {'k2': 2}, {'k3': None}]
+    messages = [{'id': 1001, 'k1': 'v1'}, {'id': 1002, 'k2': 2}, {'id': 1003, 'k3': None}]
 
     def fake_ws_async(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
         assert url_in == url_wss
@@ -441,11 +449,23 @@ async def test_site_aget_realtime_updates(monkeypatch):
 
     monkeypatch.setattr(Communicator, 'websocket_generator_async', fake_ws_async)
 
-    data_async = await site.aget_realtime_instance_updates(restart_on_close=False)
+    # as_dict=True
+    data_async = await site.aget_realtime_instance_updates(restart_on_close=False, restart_on_error=False, as_dict=True)
     collected = []
     async for item in data_async.data_fetcher:
         collected.append(item)
     assert collected == messages
+
+    # as_dict=False -> Site instances with auth token
+    data_async2 = await site.aget_realtime_instance_updates(
+        restart_on_close=False, restart_on_error=False, as_dict=False
+    )
+    collected2 = []
+    async for item in data_async2.data_fetcher:
+        collected2.append(item)
+    assert all(isinstance(it, Site) for it in collected2)
+    assert [it.id for it in collected2] == [m['id'] for m in messages]
+    assert all(getattr(it, '_auth_token') == token for it in collected2)
 
 
 def test_site_get_data(monkeypatch):
@@ -599,3 +619,111 @@ async def test_site_aget_data_changes(monkeypatch):
     changes, combined = await site.aget_data_changes(as_dict=True)
     assert isinstance(changes, list)
     assert hasattr(combined, 'data_fetcher')
+
+
+def test_site_get_realtime_data_changes_updates(monkeypatch):
+    token = 'tok'
+    site = Site(id=SITE_ID, auth_token=token)
+    url_http = f"{RESTREAM_HOST}{ENDPOINTS.site_changelog_updates_websocket.value}".format(id=site.id)
+    url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
+
+    messages = [
+        {
+            "id": 501,
+            "site": site.id,
+            "modification_type": "transaction",
+            "modification_subtype": "add",
+            "start_date": "2020-01-01T00:00:00Z",
+            "end_date": "2020-01-01T01:00:00Z",
+        },
+        {
+            "id": 502,
+            "site": site.id,
+            "modification_type": "translation_layer",
+            "modification_subtype": "change",
+            "start_date": "2020-01-02T00:00:00Z",
+            "end_date": "2020-01-02T01:00:00Z",
+        },
+    ]
+
+    def fake_ws(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
+        assert url_in == url_wss
+        assert auth_token == token
+        return iter(messages)
+
+    monkeypatch.setattr(Communicator, 'websocket_generator', fake_ws)
+
+    # as_dict=True
+    data_obj = site.get_realtime_data_changes_updates(restart_on_close=False, restart_on_error=False, as_dict=True)
+    out = list(data_obj.data_fetcher)
+    assert out == messages
+
+    # as_dict=False -> DataChanges instances with auth
+    data_obj2 = site.get_realtime_data_changes_updates(restart_on_close=False, restart_on_error=False, as_dict=False)
+    out2 = list(data_obj2.data_fetcher)
+    from restreamsolutions.data_changes import DataChanges
+
+    assert all(isinstance(it, DataChanges) for it in out2)
+    assert [it.id for it in out2] == [m['id'] for m in messages]
+    assert all(getattr(it, '_auth_token') == token for it in out2)
+
+
+@pytest.mark.asyncio
+async def test_site_aget_realtime_data_changes_updates(monkeypatch):
+    token = 'tok'
+    site = Site(id=SITE_ID, auth_token=token)
+    url_http = f"{RESTREAM_HOST}{ENDPOINTS.site_changelog_updates_websocket.value}".format(id=site.id)
+    url_wss = url_http.replace('https://', 'wss://').replace('http://', 'ws://')
+
+    messages = [
+        {
+            "id": 601,
+            "site": site.id,
+            "modification_type": "transaction",
+            "modification_subtype": "add",
+            "start_date": "2020-01-03T00:00:00Z",
+            "end_date": "2020-01-03T01:00:00Z",
+        },
+        {
+            "id": 602,
+            "site": site.id,
+            "modification_type": "translation_layer",
+            "modification_subtype": "change",
+            "start_date": "2020-01-04T00:00:00Z",
+            "end_date": "2020-01-04T01:00:00Z",
+        },
+    ]
+
+    def fake_ws_async(url_in, auth_token, params=None, ack_message=None, additional_headers=None):
+        assert url_in == url_wss
+        assert auth_token == token
+
+        async def _agen():
+            for m in messages:
+                yield m
+
+        return _agen()
+
+    monkeypatch.setattr(Communicator, 'websocket_generator_async', fake_ws_async)
+
+    # as_dict=True
+    data_async = await site.aget_realtime_data_changes_updates(
+        restart_on_close=False, restart_on_error=False, as_dict=True
+    )
+    collected = []
+    async for item in data_async.data_fetcher:
+        collected.append(item)
+    assert collected == messages
+
+    # as_dict=False -> DataChanges instances with auth
+    data_async2 = await site.aget_realtime_data_changes_updates(
+        restart_on_close=False, restart_on_error=False, as_dict=False
+    )
+    collected2 = []
+    async for item in data_async2.data_fetcher:
+        collected2.append(item)
+    from restreamsolutions.data_changes import DataChanges
+
+    assert all(isinstance(it, DataChanges) for it in collected2)
+    assert [it.id for it in collected2] == [m['id'] for m in messages]
+    assert all(getattr(it, '_auth_token') == token for it in collected2)

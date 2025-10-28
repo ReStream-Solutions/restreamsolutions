@@ -417,12 +417,12 @@ Occasionally, historical data may be corrected. You can get information about wh
 affected and download only the updated data.
 
 The `get_data_changes()` method (and its async version `aget_data_changes()`) is available for `Site` and `Pad` classes.
-It returns a tuple containing a list of `DataChange` objects and a single `Data` or `DataAsync` object for fetching 
-the corresponding data.
+It returns a tuple containing a list of `DataChanges` objects and a single `Data` or `DataAsync` object for fetching 
+ the corresponding data.
 
 After receiving and processing the changes, you need to confirm their retrieval. This ensures that the next time you 
 check for data changes, the ones already processed will be excluded. To do this, call `confirm_data_received()`
-(or `aconfirm_data_received()` for the async version) on the `DataChange` objects you have handled.
+(or `aconfirm_data_received()` for the async version) on the `DataChanges` objects you have handled.
 
 ```python
 from restreamsolutions import Pad
@@ -491,19 +491,24 @@ In addition to periodically checking for changes via `get_data_changes()`/`aget_
 live stream of data-change events over WebSocket using `get_realtime_data_changes_updates()` and
 `aget_realtime_data_changes_updates()` on `Site` and `Pad` objects.
 
-Important: these functions return data-change events as Python `dict` objects (metadata only) and do not include the
-changed data itself. To load the actual records, use the `Data`/`DataAsync` objects returned by
-`get_data_changes()` and `aget_data_changes()` on `Site`/`Pad`. Those methods return a list of change events as a convenient
-`Data`/`DataAsync` from which you can iterate over the affected records or save them to a file.
+By default, these functions yield `DataChanges` instances (rich objects with methods like `confirm_data_received()`). 
+If you prefer to receive raw dictionaries, pass `as_dict=True`.
+
+Note: the stream contains only change metadata (IDs, time windows, types, etc.) — it does not include the changed 
+data itself. To load the actual records, use the `Data`/`DataAsync` objects returned by
+`get_data_changes()` / `aget_data_changes()` on `Site`/`Pad`.
 
 ```python
 from restreamsolutions import Pad
 
 pad = Pad(id=681)
-updates = pad.get_realtime_data_changes_updates()
+updates = pad.get_realtime_data_changes_updates()  # yields DataChanges instances by default
 
-for event in updates.data_fetcher:  # event is a dict with change metadata (id, modification_type, etc.)
-    print(event)
+for event in updates.data_fetcher:
+    # event is a DataChanges instance
+    print(event.id, event.modification_type)
+    # You can immediately confirm receipt if desired
+    # event.confirm_data_received()
 ```
 
 #### Real-time Sites and Pads updates
@@ -512,15 +517,19 @@ You can subscribe to a continuous stream of real-time updates for a Pad (or Site
 The method returns a lazy `Data`/`DataAsync` object whose `data_fetcher` yields updates one by one.
 Use `get_realtime_instance_updates()` and `aget_realtime_instance_updates()` methods of the `Pad` and `Site` classes.
 
+By default, these methods yield model instances (`Pad` or `Site`). If you prefer to receive raw dictionaries, 
+pass `as_dict=True`.
+
 ```python
 from restreamsolutions import Pad
 
 pad = Pad(id=681)
-updates = pad.get_realtime_instance_updates()
+updates = pad.get_realtime_instance_updates()  # yields Pad instances by default
 
 # Iterate over incoming messages (blocking loop)
-for message in updates.data_fetcher:
-    print(message)
+for pad_update in updates.data_fetcher:
+    # item is a Pad instance
+    print(pad_update.id, pad_update.name)
     # Add your own break condition if needed
     # if should_stop():
     #     break

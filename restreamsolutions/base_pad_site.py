@@ -559,36 +559,53 @@ class BasePadSite(BaseInterface):
     def _get_real_time_updates_object(
         self,
         endpoint_url: str,
+        convert_to: object = None,
         restart_on_error: bool = True,
         restart_on_close: bool = True,
     ) -> Data:
         """Helper to build a Data object for a generic real-time WebSocket endpoint (sync)."""
         url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
         data_generator_factory = lambda: Communicator.websocket_generator(url, auth_token=self._auth_token)
-        return Data(data_generator_factory, restart_on_error=restart_on_error, restart_on_close=restart_on_close)
+        return Data(
+            data_generator_factory,
+            convert_to=convert_to,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+            auth_token=self._auth_token,
+        )
 
     async def _aget_real_time_updates_object(
         self,
         endpoint_url: str,
+        convert_to: object = None,
         restart_on_error: bool = True,
         restart_on_close: bool = True,
     ) -> DataAsync:
         """Helper to build a DataAsync for a generic real-time WebSocket endpoint (async)."""
         url = self._format_url(endpoint_url, is_websocket=True, id=self.id)
         data_generator_factory = lambda: Communicator.websocket_generator_async(url, auth_token=self._auth_token)
-        return DataAsync(data_generator_factory, restart_on_error=restart_on_error, restart_on_close=restart_on_close)
+        return DataAsync(
+            data_generator_factory,
+            convert_to=convert_to,
+            restart_on_error=restart_on_error,
+            restart_on_close=restart_on_close,
+            auth_token=self._auth_token,
+        )
 
-    def get_realtime_instance_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:
+    def get_realtime_instance_updates(
+        self, as_dict: bool = False, restart_on_error: bool = True, restart_on_close: bool = True
+    ) -> Data:
         """Get a Data stream of real-time instance (Pad/Site) updates over WebSocket (sync).
         See the documentation in the overridden methods for more information."""
         return self._get_real_time_updates_object(
             self._api_url_instance_updates_websocket,
             restart_on_error=restart_on_error,
             restart_on_close=restart_on_close,
+            convert_to=None if as_dict else self.__class__,
         )
 
     async def aget_realtime_instance_updates(
-        self, restart_on_error: bool = True, restart_on_close: bool = True
+        self, as_dict: bool = False, restart_on_error: bool = True, restart_on_close: bool = True
     ) -> DataAsync:
         """Get a DataAsync stream of real-time instance (Pad/Site) updates over WebSocket (async).
         See the documentation in the overridden methods for more information."""
@@ -596,101 +613,137 @@ class BasePadSite(BaseInterface):
             self._api_url_instance_updates_websocket,
             restart_on_error=restart_on_error,
             restart_on_close=restart_on_close,
+            convert_to=None if as_dict else self.__class__,
         )
 
-    def get_realtime_data_changes_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:
-        """Create a Data object that provides a lazy WebSocket stream of real-time data-change
-        events for this Pad/Site.
+    def get_realtime_data_changes_updates(
+        self,
+        as_dict: bool = False,
+        restart_on_error: bool = True,
+        restart_on_close: bool = True,
+    ) -> Data:
+        """Create a Data object that provides a lazy WebSocket stream of real-time
+        data-change events for this Pad/Site.
 
         Parameters:
-            restart_on_error: If True, the returned Data instance will automatically attempt to reconnect
-            to the server if an error occurs.
-            restart_on_close: If True, the Data instance will also recreate the underlying generator when
-            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
+            as_dict (bool): Controls the type of yielded items.
+                - False (default): each item is converted to a DataChanges instance.
+                - True: each item is returned as a raw dict payload.
+            restart_on_error (bool): If True, the returned Data instance will automatically
+                attempt to reconnect to the server if an error occurs.
+            restart_on_close (bool): If True, the Data instance will also recreate the underlying
+                generator when the stream completes normally (e.g., clean WebSocket close) and
+                continue streaming.
 
-        data.data_fetcher is a lazy synchronous generator. Each iteration blocks until the next
-        update message is received. You can also persist the stream to a file via
-        data.save(path: str, overwrite: bool = False).
+        Notes:
+            - data.data_fetcher is a lazy synchronous generator. Each iteration blocks
+              until the next update message is received.
+            - You can persist the stream to a file via data.save(path: str, overwrite: bool = False).
 
-        Each message is a JSON object describing a single change event in the data for a specific site.
-        A typical payload contains the following fields (example shown below):
-          - id (int): Unique identifier of the change event.
-          - created_at (str, ISO 8601): Timestamp when the change was recorded on the server.
-          - modification_type (str): One of "translation_layer" or "transaction".
-          - modification_subtype (str): Specific change action, e.g. "move", "move_delete", "move_copy",
-            "delete", "augment", "augment_update", "augment_insert", "annotate", "override", "add",
-            "change", "reverse".
-          - start_date (str, ISO 8601): Start of the affected time interval.
-          - end_date (str, ISO 8601): End of the affected time interval.
-          - site (int): Identifier of the parent site.
+        Payload schema:
+            Each message is a JSON object describing a single change event in the data for a specific site.
+            A typical payload contains the following fields (example shown below):
+              - id (int): Unique identifier of the change event.
+              - created_at (str, ISO 8601): Timestamp when the change was recorded on the server.
+              - modification_type (str): One of "translation_layer" or "transaction".
+              - modification_subtype (str): Specific change action, e.g. "move", "move_delete", "move_copy",
+                "delete", "augment", "augment_update", "augment_insert", "annotate", "override", "add",
+                "change", "reverse".
+              - start_date (str, ISO 8601): Start of the affected time interval.
+              - end_date (str, ISO 8601): End of the affected time interval.
+              - site (int): Identifier of the parent site.
 
-        Example message:
-            {
-                "id": 61285,
-                "created_at": "2025-10-17T11:39:43.688700Z",
-                "modification_type": "translation_layer",
-                "modification_subtype": "add",
-                "start_date": "2022-06-29T19:25:52Z",
-                "end_date": "2025-10-17T11:39:44.687991Z",
-                "site": 1173
-            }
+            Example message:
+                {
+                    "id": 61285,
+                    "created_at": "2025-10-17T11:39:43.688700Z",
+                    "modification_type": "translation_layer",
+                    "modification_subtype": "add",
+                    "start_date": "2022-06-29T19:25:52Z",
+                    "end_date": "2025-10-17T11:39:44.687991Z",
+                    "site": 1173
+                }
 
         Returns:
-            Data: A Data object whose data_fetcher yields update messages one by one.
+            Data: A Data object whose data_fetcher yields data-change messages either as
+            DataChanges instances or dictionaries depending on as_dict.
         """
+        if as_dict:
+            convert_to = None
+        else:
+            from .data_changes import DataChanges
+
+            convert_to = DataChanges
+
         return self._get_real_time_updates_object(
             self._api_url_changelog_updates_websocket,
             restart_on_error=restart_on_error,
             restart_on_close=restart_on_close,
+            convert_to=convert_to,
         )
 
     async def aget_realtime_data_changes_updates(
         self,
+        as_dict: bool = False,
         restart_on_error: bool = True,
         restart_on_close: bool = True,
     ) -> DataAsync:
-        """Create a DataAsync object that provides a lazy WebSocket stream of real-time
-        data-change events for this Pad/Site.
+        """Create a DataAsync object that provides a lazy WebSocket stream of
+        real-time data-change events for this Pad/Site (async).
 
         Parameters:
-            restart_on_error: If True, the returned DataAsync instance will automatically attempt to reconnect
-            to the server if an error occurs.
-            restart_on_close: If True, the DataAsync wrapper will also recreate the underlying async generator when
-            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
+            as_dict (bool): Controls the type of yielded items.
+                - False (default): each item is converted to a DataChanges instance.
+                - True: each item is returned as a raw dict payload.
+            restart_on_error (bool): If True, the returned DataAsync instance will automatically
+                attempt to reconnect to the server if an error occurs.
+            restart_on_close (bool): If True, the DataAsync wrapper will also recreate the underlying
+                async generator when the stream completes normally (e.g., clean WebSocket close) and
+                continue streaming.
 
-        data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next
-        update message. You can also persist the stream to a file via
-        data.asave(path: str, overwrite: bool = False).
+        Notes:
+            - data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits
+              the next update message.
+            - You can persist the stream to a file via data.asave(path: str, overwrite: bool = False).
 
-        Each message is a JSON object describing a single change event in the data for a specific site.
-        A typical payload contains the following fields (example shown below):
-          - id (int): Unique identifier of the change event.
-          - created_at (str, ISO 8601): Timestamp when the change was recorded on the server.
-          - modification_type (str): One of "translation_layer" or "transaction".
-          - modification_subtype (str): Specific change action, e.g. "move", "move_delete", "move_copy",
-            "delete", "augment", "augment_update", "augment_insert", "annotate", "override", "add",
-            "change", "reverse".
-          - start_date (str, ISO 8601): Start of the affected time interval.
-          - end_date (str, ISO 8601): End of the affected time interval.
-          - site (int): Identifier of the parent site.
+        Payload schema:
+            Each message is a JSON object describing a single change event in the data for a specific site.
+            A typical payload contains the following fields (example shown below):
+              - id (int): Unique identifier of the change event.
+              - created_at (str, ISO 8601): Timestamp when the change was recorded on the server.
+              - modification_type (str): One of "translation_layer" or "transaction".
+              - modification_subtype (str): Specific change action, e.g. "move", "move_delete", "move_copy",
+                "delete", "augment", "augment_update", "augment_insert", "annotate", "override", "add",
+                "change", "reverse".
+              - start_date (str, ISO 8601): Start of the affected time interval.
+              - end_date (str, ISO 8601): End of the affected time interval.
+              - site (int): Identifier of the parent site.
 
-        Example message:
-            {
-                "id": 61285,
-                "created_at": "2025-10-17T11:39:43.688700Z",
-                "modification_type": "translation_layer",
-                "modification_subtype": "add",
-                "start_date": "2022-06-29T19:25:52Z",
-                "end_date": "2025-10-17T11:39:44.687991Z",
-                "site": 1173
-            }
+            Example message:
+                {
+                    "id": 61285,
+                    "created_at": "2025-10-17T11:39:43.688700Z",
+                    "modification_type": "translation_layer",
+                    "modification_subtype": "add",
+                    "start_date": "2022-06-29T19:25:52Z",
+                    "end_date": "2025-10-17T11:39:44.687991Z",
+                    "site": 1173
+                }
 
         Returns:
-            DataAsync: A DataAsync object whose data_fetcher yields update messages one by one when
-            asynchronously iterated over.
+            DataAsync: A DataAsync object whose data_fetcher yields data-change messages either as
+            DataChanges instances or dictionaries depending on as_dict.
         """
+        if as_dict:
+            convert_to = None
+        else:
+            from .data_changes import DataChanges
+
+            convert_to = DataChanges
+
         return await self._aget_real_time_updates_object(
             self._api_url_changelog_updates_websocket,
             restart_on_error=restart_on_error,
             restart_on_close=restart_on_close,
+            convert_to=convert_to,
         )

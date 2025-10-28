@@ -592,80 +592,85 @@ class Pad(BasePadSite):
         )
         return data_async, key
 
-    def get_realtime_instance_updates(self, restart_on_error: bool = True, restart_on_close: bool = True) -> Data:
-        """Creates a Data class, containing a lazy WebSocket stream of real-time updates for this Pad.
+    def get_realtime_instance_updates(
+        self, as_dict: bool = False, restart_on_error: bool = True, restart_on_close: bool = True
+    ) -> Data:
+        """Create a Data object that provides a lazy WebSocket stream of real-time
+        updates for this Pad.
 
         Parameters:
-            restart_on_error: If True (default), the returned Data instance will automatically attempt to reconnect
-            to the server if an error occurs.
-            restart_on_close: If True (default), the Data wrapper will also recreate the underlying generator when
-            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
+            as_dict (bool): Controls the type of yielded items.
+                - False (default): each item is converted to a Pad instance.
+                - True: each item is returned as a raw dict payload.
+            restart_on_error (bool): If True (default), the returned Data instance will automatically
+                attempt to reconnect to the server if an error occurs.
+            restart_on_close (bool): If True (default), the Data wrapper will also recreate the underlying
+                generator when the stream completes normally (e.g., clean WebSocket close) and continue streaming.
 
-        data.data_fetcher is a lazy synchronous generator. Each iteration creates a blocking call, waiting for the next
-        update.
-        data.save(path: str, overwrite: bool = False) will save all the data to a JSON file.
+        Notes:
+            - data.data_fetcher is a lazy synchronous generator. Each iteration blocks awaiting the next update.
+            - Persist the stream with data.save(path: str, overwrite: bool = False).
 
-        Each message is a JSON object that reflects the current state of this Pad and may
-        include some additional properties obtained from related entities.
-        The payload contains the following fields:
-          - id (int)
-          - name (str)
-          - lease_name (str)
-          - customer_name (str)
-          - simops_config (object | None):
-              - measurement_sources (object):
-                  - frac (list)
-                  - wl (list)
-                  - fluid (list)
-                  - pumpdown (list)
-              - exc_fields (list)
-          - completion_date (str | None, ISO 8601)
-          - wireline_enabled (bool)
+        Payload schema:
+            Each message is a JSON object that reflects the current state of this Pad and may
+            include some additional properties obtained from related entities. The payload contains
+            fields such as:
+              - id (int)
+              - name (str)
+              - lease_name (str)
+              - customer_name (str)
+              - simops_config (object | None):
+                  - measurement_sources (object): frac, wl, fluid, pumpdown (lists)
+                  - exc_fields (list)
+              - completion_date (str | None, ISO 8601)
+              - wireline_enabled (bool)
 
         Returns:
-            Data: A Data object whose data_fetcher yields update messages one by one.
+            Data: A Data object whose data_fetcher yields items as Pad instances or dicts depending on as_dict.
         """
         return super().get_realtime_instance_updates(
-            restart_on_error=restart_on_error, restart_on_close=restart_on_close
+            as_dict=as_dict, restart_on_error=restart_on_error, restart_on_close=restart_on_close
         )
 
     async def aget_realtime_instance_updates(
         self,
+        as_dict: bool = False,
         restart_on_error: bool = True,
         restart_on_close: bool = True,
     ) -> DataAsync:
-        """Creates a DataAsync class, containing a lazy WebSocket stream of real-time updates for this Pad.
+        """Create a DataAsync object that provides a lazy WebSocket stream of
+        real-time updates for this Pad (async).
 
         Parameters:
-            restart_on_error: If True (default), the returned DataAsync instance will automatically attempt to reconnect
-            to the server if an error occurs.
-            restart_on_close: If True (default), the DataAsync wrapper will also recreate the underlying async generator when
-            the stream completes normally (e.g., clean WebSocket close) and continue streaming.
+            as_dict (bool): Controls the type of yielded items.
+                - False (default): each item is converted to a Pad instance.
+                - True: each item is returned as a raw dict payload.
+            restart_on_error (bool): If True (default), the returned DataAsync instance will automatically
+                attempt to reconnect to the server if an error occurs.
+            restart_on_close (bool): If True (default), the DataAsync wrapper will also recreate the underlying
+                async generator when the stream completes normally (e.g., clean WebSocket close) and continue streaming.
 
-        data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next update.
-        data.asave(path: str, overwrite: bool = False) will asynchronously save all the data to a JSON file.
+        Notes:
+            - data.data_fetcher is a lazy asynchronous generator. Each async iteration awaits the next update.
+            - Persist the stream with data.asave(path: str, overwrite: bool = False).
 
-        Each message is a JSON object that reflects the current state of this Pad and may
-        include some additional properties obtained from related entities.
-        The payload contains the following fields:
-          - id (int)
-          - name (str)
-          - lease_name (str)
-          - customer_name (str)
-          - simops_config (object | None):
-              - measurement_sources (object):
-                  - frac (list)
-                  - wl (list)
-                  - fluid (list)
-                  - pumpdown (list)
-              - exc_fields (list)
-          - completion_date (str | None, ISO 8601)
-          - wireline_enabled (bool)
+        Payload schema:
+            Each message is a JSON object that reflects the current state of this Pad and may
+            include some additional properties obtained from related entities. The payload contains
+            fields such as:
+              - id (int)
+              - name (str)
+              - lease_name (str)
+              - customer_name (str)
+              - simops_config (object | None):
+                  - measurement_sources (object): frac, wl, fluid, pumpdown (lists)
+                  - exc_fields (list)
+              - completion_date (str | None, ISO 8601)
+              - wireline_enabled (bool)
 
         Returns:
-            DataAsync: A DataAsync object whose data_fetcher yields update messages one by one when asynchronously
-            iterated over.
+            DataAsync: A DataAsync object whose data_fetcher yields items as Pad instances or dicts depending on as_dict when asynchronously iterated over.
         """
         return await super().aget_realtime_instance_updates(
-            restart_on_error=restart_on_error, restart_on_close=restart_on_close
+            as_dict=as_dict, restart_on_error=restart_on_error, restart_on_close=restart_on_close
         )
