@@ -65,115 +65,6 @@ In the examples, this step is omitted for the sake of brevity.
 
 ### Quickstart for Common Use Cases
 
-#### Low latency Data Synchronization Using Websockets
-
-```python
-import os
-from datetime import datetime, timedelta, timezone
-from restreamsolutions import Pad
-import asyncio
-from typing import Any
-
-os.environ["RESTREAM_AUTH_TOKEN"] = "your token goes here"
-
-
-# Run this inside of a celery task or cron job at a frequency of once every 3 seconds.
-async def synchronize_restream_data():
-    async def get_data(pad: Pad):
-        try:
-            # Check if pad is already actively connected to a websocket.
-            if await pad_is_connected(pad):
-                print(
-                    f"Pad {pad.id} is already actively connected to a websocket. Skipping data synchronization."
-                )
-                return
-
-            tasks = [
-                # handle_pad_websocket(pad),
-                handle_pad_data_websocket(pad),
-                # handle_pad_data_changes_websocket(pad),
-            ]
-            await asyncio.gather(*tasks, return_exceptions=True)
-        except Exception as e:
-            # Handle the errors and continue with the next pad.
-            print(f"Error getting data for pad {pad.id}: {e}")
-
-    # Get all pads that are not completed yet
-    pads = await Pad.aget_models(complete=False)
-    await asyncio.gather(*[get_data(pad) for pad in pads], return_exceptions=True)
-
-
-async def handle_pad_websocket(pad: Pad):
-    pad_websocket = await pad.aget_realtime_instance_updates()
-    async for item in pad_websocket.data_fetcher:
-        # Handle your pad websocket updates here.
-        print("item: ", item)
-        item
-
-async def handle_pad_data_websocket(pad: Pad):
-    fields_to_request: list[str] = await sync_fluid_fields_metadata(pad)
-    data_websocket, session_key = await pad.aget_realtime_measurements_data()
-    # Use session_key to resume connection if needed.
-    async for item in data_websocket.data_fetcher:
-        # Handle your pad data websocket updates here.
-        # Use item.get to access the fields safely.
-        print("item: ", item)
-        last_timestamp: datetime = await get_last_timestamp_for_pad(pad)
-        if item.get("unix_timestamp") > last_timestamp.timestamp():
-            print("Updating last timestamp for pad: ", pad.id)
-            await update_last_timestamp_for_pad(pad, item.get("unix_timestamp"))
-            print("done updating last timestamp")
-        for field in fields_to_request:
-            if field in item:
-                print("field: ", field)
-                print("item[field]: ", item[field])
-                print("--------------------------------")
-        
-
-async def handle_pad_data_changes_websocket(pad: Pad):
-    change_events = await pad.aget_realtime_data_changes_updates()
-    async for item in change_events.data_fetcher:
-        # Handle your pad data changes websocket updates here.
-        print("item: ", item)
-
-
-async def get_last_timestamp_for_pad(pad: Pad) -> datetime:
-    # Get the last timestamp successfully received for this pad from your own database.
-    return datetime.now(timezone.utc) - timedelta(seconds=5)
-
-
-async def update_last_timestamp_for_pad(pad: Pad, timestamp: datetime.timestamp):
-    # Update the last timestamp for this pad in your own database.
-    pass
-
-
-async def sync_fluid_fields_metadata(pad: Pad) -> list[str]:
-    # Maybe check if the pad fields have already been identified and synced within the past x hours first.
-
-    # Then sync the field metadata.
-    SHOULD_SYNC_FIELDS_METADATA: bool = False
-    fields: list[dict[str, Any]] = await pad.aget_fields_metadata()
-    fields_to_request: list[str] = []
-    # Here you might filter the fields to request and internally map the names to your own field names.
-    for field in fields:
-        if field["source_category"] == "fluid":
-            fields_to_request.append(field["name"])
-    if SHOULD_SYNC_FIELDS_METADATA:
-        # Sync the fields metadata to your own database.
-        pass
-    return fields_to_request
-
-
-async def pad_is_connected(pad: Pad) -> bool:
-    # Check if pad is already actively connected to a websocket in your own database.
-    pass
-
-
-if __name__ == "__main__":
-    asyncio.run(synchronize_restream_data())
-
-```
-
 #### Async Python Polling API Data Syncing
 
 ```python
@@ -184,7 +75,8 @@ from restreamsolutions.data_object import DataAsync
 import asyncio
 from typing import Any
 
-os.environ["RESTREAM_AUTH_TOKEN"] = "your token goes here"
+os.environ["RESTREAM_CLIENT_ID"] = "your_client_id"
+os.environ["RESTREAM_CLIENT_SECRET"] = "your_client_secret"
 
 
 # Run this inside of a celery task or cron job at a frequency of once every 3 seconds.
@@ -310,7 +202,9 @@ from restreamsolutions import Pad
 from restreamsolutions.data_object import Data
 from typing import Any
 
-os.environ["RESTREAM_AUTH_TOKEN"] = "your token goes here"
+os.environ["RESTREAM_CLIENT_ID"] = "your_client_id"
+os.environ["RESTREAM_CLIENT_SECRET"] = "your_client_secret"
+
 
 
 # Run this inside of a celery task or cron job at a frequency of once every 3 seconds.
