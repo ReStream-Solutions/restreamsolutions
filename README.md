@@ -98,6 +98,251 @@ You will primarily interact with two classes, `Site` and `Pad`, which provide ac
 through the Restream API. Configure authentication as shown above (via RESTREAM_CLIENT_ID/RESTREAM_CLIENT_SECRET) or pass
 an access token directly to methods/constructors when needed. In the examples, this step is omitted for brevity.
 
+### Quickstart for Common Use Cases
+
+#### Async Python Polling API Data Syncing
+
+```python
+import os
+from datetime import datetime, timedelta, timezone
+from restreamsolutions import Pad
+from restreamsolutions.data_object import DataAsync
+import asyncio
+from typing import Any
+
+os.environ["RESTREAM_CLIENT_ID"] = "your_client_id"
+os.environ["RESTREAM_CLIENT_SECRET"] = "your_client_secret"
+
+
+# Run this inside of a celery task or cron job at a frequency of once every 3 seconds.
+async def synchronize_restream_data():
+    async def get_data(pad: Pad):
+        try:
+            SHOULD_SYNC_SITE_METADATA = False
+            fields_to_request: list[str] = await sync_fluid_fields_metadata(pad)
+            # Maybe check if the site metadata has already been identified and synced within the past x hours first.
+            # Then sync the site metadata to your own database.
+            if SHOULD_SYNC_SITE_METADATA:
+                await sync_site_metadata(pad)
+
+            # Then get the last timestamp of the data for this pad in your own database.
+            last_timestamp: datetime = await get_last_timestamp_for_pad(pad)
+
+            # Then get the data for this pad.
+            # is_routed=True means that each item represents data for a specific site and will have a site_id field.
+            # Use is_routed=False if you want to get data for the entire pad without routing considered.
+            # (unrouted data contains prefixed fields for each measurement source. eg. M1_slurry_rate, M2_slurry_rate, etc.)
+            data: DataAsync = await pad.aget_data(
+                fields=fields_to_request, is_routed=True, start_datetime=last_timestamp
+            )
+            async for item in data.data_fetcher:
+                # Then you can use the site id to route the data to the correct site in your own database.
+                site_id = item["site_id"]
+                # And compare the timestamp of the item to the last timestamp of the data for this pad in your own database.
+                if item["timestamp"] > last_timestamp.timestamp():
+                    print("Updating last timestamp for pad: ", pad.id)
+                    await update_last_timestamp_for_pad(pad, item["timestamp"])
+                print("site_id: ", site_id)
+                print("item: ", item)
+                print("--------------------------------")
+        except Exception as e:
+            # Handle the errors and continue with the next pad.
+            print(f"Error getting data for pad {pad.id}: {e}")
+
+    # Get all pads that are not completed yet
+    pads = await Pad.aget_models(complete=False)
+    await asyncio.gather(*[get_data(pad) for pad in pads])
+
+
+# Run this inside of a celery task or cron job at a frequency of once every 15 minutes or so.
+async def check_for_data_changes_and_update():
+    async def handle_pad(pad: Pad):
+        try:
+            # Get field metadata for this pad.
+            fields_to_request: list[str] = await sync_fluid_fields_metadata(pad)
+            # Then get the data changes for this pad.
+            change_events, changed_data = await pad.aget_data_changes()
+            async for item in changed_data.data_fetcher:
+                # Overwrite the data for this item in your own database.
+                site_id = item["site_id"]
+                filtered_item = {
+                    k: v for k, v in item.items() if k in fields_to_request
+                }
+                print("site_id: ", site_id)
+                print("filtered_item: ", filtered_item)
+                print("--------------------------------")
+
+            # Confirm the data changes have been received and processed. This will exclude these changes from the next check.
+            for change in change_events:
+                result = await change.aconfirm_data_received()
+                print(f"Confirmed changed data received event {change}: {result}")
+        except Exception as e:
+            print(f"Error checking for data changes and updating: {e}")
+
+    # Get all pads that are not completed yet
+    pads: list[Pad] = await Pad.aget_models(complete=True)
+    await asyncio.gather(*[handle_pad(pad) for pad in pads])
+
+
+async def get_last_timestamp_for_pad(pad: Pad) -> datetime:
+    # Get the last timestamp successfully received for this pad from your own database.
+    return datetime.now(timezone.utc) - timedelta(seconds=5)
+
+
+async def update_last_timestamp_for_pad(pad: Pad, timestamp: datetime.timestamp):
+    # Update the last timestamp for this pad in your own database.
+    pass
+
+
+async def sync_fluid_fields_metadata(pad: Pad) -> list[str]:
+    # Maybe check if the pad fields have already been identified and synced within the past x hours first.
+
+    # Then sync the field metadata.
+    SHOULD_SYNC_FIELDS_METADATA: bool = False
+    fields: list[dict[str, Any]] = await pad.aget_fields_metadata()
+    fields_to_request: list[str] = []
+    # Here you might filter the fields to request and internally map the names to your own field names.
+    for field in fields:
+        if field["source_category"] == "fluid":
+            fields_to_request.append(field["name"])
+    if SHOULD_SYNC_FIELDS_METADATA:
+        # Sync the fields metadata to your own database.
+        pass
+    return fields_to_request
+
+
+async def sync_site_metadata(pad: Pad):
+    sites = await pad.aget_sites()
+    for site in sites:
+        # Get all data for this site
+        well_api = site.well_api
+        if well_api:
+            # Then you can use the well_api to query your own database for the site metadata.
+            # You can then use the site metadata to sync the data for this site.
+            pass
+
+
+if __name__ == "__main__":
+    asyncio.run(synchronize_restream_data())
+    asyncio.run(check_for_data_changes_and_update())
+
+```
+
+#### Standard Single Threaded Python Polling API Data Syncing
+
+```python
+import os
+from datetime import datetime, timedelta, timezone
+from restreamsolutions import Pad
+from restreamsolutions.data_object import Data
+from typing import Any
+
+os.environ["RESTREAM_CLIENT_ID"] = "your_client_id"
+os.environ["RESTREAM_CLIENT_SECRET"] = "your_client_secret"
+
+
+
+# Run this inside of a celery task or cron job at a frequency of once every 3 seconds.
+def synchronize_restream_data():
+    # Get all pads that are not completed yet
+    pads: list[Pad] = Pad.get_models(complete=False)
+    for pad in pads:
+        # Get field metadata for this pad.
+
+        # Maybe check if the pad fields have already been identified and synced within the past x hours first.
+
+        # Then sync the field metadata.
+        fields_to_request: list[str] = sync_fluid_fields_metadata(pad)
+        # Maybe check if the site metadata has already been identified and synced within the past x hours first.
+        # Then sync the site metadata to your own database.
+        sync_site_metadata(pad)
+
+        # Then get the last timestamp of the data for this pad in your own database.
+        last_timestamp: datetime = get_last_timestamp_for_pad(pad)
+
+        # Then get the data for this pad.
+        # is_routed=True means that each item represents data for a specific site and will have a site_id field.
+        # Use is_routed=False if you want to get data for the entire pad without routing considered.
+        # (unrouted data contains prefixed fields for each measurement source. eg. M1_slurry_rate, M2_slurry_rate, etc.)
+        data: Data = pad.get_data(
+            fields=fields_to_request, is_routed=True, start_datetime=last_timestamp
+        )
+        for item in data.data_fetcher:
+            # Then you can use the site id to route the data to the correct site in your own database.
+            site_id = item["site_id"]
+            # And compare the timestamp of the item to the last timestamp of the data for this pad in your own database.
+            if item["timestamp"] > last_timestamp.timestamp():
+                print("Updating last timestamp for pad: ", pad.id)
+                update_last_timestamp_for_pad(pad, item["timestamp"])
+            print("site_id: ", site_id)
+            print("item: ", item)
+            print("--------------------------------")
+
+
+# Run this inside of a celery task or cron job at a frequency of once every 15 minutes or so.
+def check_for_data_changes_and_update():
+    # Get all pads that are not completed yet
+    pads: list[Pad] = Pad.get_models(complete=True)
+    for pad in pads:
+        try:
+            # Get the last timestamp of the data for this pad in your own database.
+            last_timestamp: datetime = get_last_timestamp_for_pad(pad)
+            fields_to_request: list[str] = sync_fluid_fields_metadata(pad)
+            # Then get the data changes for this pad.
+            change_events, changed_data = pad.get_data_changes()
+            for item in changed_data.data_fetcher:
+                # Overwrite the data for this item in your own database.
+                site_id = item["site_id"]
+                filtered_item = {
+                    k: v for k, v in item.items() if k in fields_to_request
+                }
+                print("site_id: ", site_id)
+                print("filtered_item: ", filtered_item)
+                print("--------------------------------")
+
+            # Confirm the data changes have been received and processed. This will exclude these changes from the next check.
+            for change in change_events:
+                result = change.confirm_data_received()
+                print(f"Confirmed changed data received event {change}: {result}")
+        except Exception as e:
+            print(f"Error checking for data changes and updating: {e}")
+
+
+def get_last_timestamp_for_pad(pad: Pad) -> datetime:
+    # Get the last timestamp successfully received for this pad from your own database.
+    return datetime.now(timezone.utc) - timedelta(seconds=5)
+
+
+def update_last_timestamp_for_pad(pad: Pad, timestamp: datetime.timestamp):
+    # Update the last timestamp for this pad in your own database.
+    pass
+
+
+def sync_fluid_fields_metadata(pad: Pad):
+    # Get field metadata for this pad.
+    fields = pad.get_fields_metadata()
+    fields_to_request = []
+    # Here you might filter the fields to request and internally map the names to your own field names.
+    for field in fields:
+        if field["source_category"] == "fluid":
+            fields_to_request.append(field["name"])
+    return fields_to_request
+
+
+def sync_site_metadata(pad: Pad):
+    sites = pad.get_sites()
+    for site in sites:
+        # Get all data for this site
+        well_api = site.well_api
+        if well_api:
+            # Then you can use the well_api to query your own database for the site metadata.
+            # You can then use the site metadata to sync the data for this site.
+            pass
+```
+
+
+
+
 ### Fetching Sites and Pads
 
 #### Get a list of all models
