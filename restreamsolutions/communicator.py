@@ -20,7 +20,7 @@ import json
 from aiohttp import WSServerHandshakeError
 from websocket import WebSocket, WebSocketConnectionClosedException, WebSocketBadStatusException
 
-from .constants import ENDPOINTS, RESTREAM_HOST
+from .constants import ENDPOINTS, RESTREAM_HOST, MAX_CONCURRENT_CALLS_TO_ENDPOINT, MAX_CONCURRENT_CALLS_TO_WEBSOCKET
 from .exceptions import (
     AuthError,
     APICompatibilityError,
@@ -122,6 +122,90 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
         return decorator
     else:
         return decorator(_func)
+
+
+class ConcurrencyLimiter:
+    """Thread-safe context manager to limit concurrent sync calls per key.
+
+    Purpose:
+        Prevents sending too many simultaneous requests to the Restream backend,
+        helping avoid APIConcurrencyLimitError (HTTP 429 / concurrency limit).
+
+    How it works:
+        - Uses a shared BoundedSemaphore per unique key (e.g., endpoint URL).
+        - The first initialization for a given key creates the semaphore with the provided limit.
+        - Subsequent initializations for the same key must pass the same limit, otherwise a ValueError is raised.
+        - Entering the context acquires a slot; exiting releases it.
+
+    Parameters:
+        key: A stable identifier that groups calls sharing the same limit (typically, a full request URL or endpoint).
+        limit: Maximum number of concurrent calls allowed for the given key.
+
+    Usage:
+        with ConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
+            response = requests.get(url, ...)
+    """
+
+    _semaphores: dict[str, threading.BoundedSemaphore] = {}
+    _limits: dict[str, int] = {}
+    _lock = threading.Lock()
+
+    def __init__(self, key: str, limit: int):
+        with self._lock:
+            if key not in self._semaphores:
+                self._semaphores[key] = threading.BoundedSemaphore(limit)
+                self._limits[key] = limit
+            elif self._limits.get(key) != limit:
+                raise ValueError(f"Key '{key}' already initialized with limit={self._limits[key]}, got {limit}")
+        self._semaphore = self._semaphores[key]
+
+    def __enter__(self):
+        self._semaphore.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._semaphore.release()
+
+
+class AsyncConcurrencyLimiter:
+    """Async context manager to limit concurrent async calls per key.
+
+    Purpose:
+        Prevents sending too many simultaneous async requests to the Restream backend,
+        helping avoid APIConcurrencyLimitError (HTTP 429 / concurrency limit).
+
+    How it works:
+        - Maintains a shared asyncio.BoundedSemaphore per unique key (e.g., endpoint URL).
+        - The first initialization for a given key creates the semaphore with the provided limit.
+        - Subsequent initializations for the same key must pass the same limit, otherwise a ValueError is raised.
+        - Entering the async context awaits a slot; exiting releases it.
+
+    Parameters:
+        key: A stable identifier that groups calls sharing the same limit (typically, a full request URL or endpoint).
+        limit: Maximum number of concurrent async calls allowed for the given key.
+
+    Usage:
+        async with AsyncConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
+            response = await client.get(url, ...)
+    """
+
+    _semaphores: dict[str, asyncio.BoundedSemaphore] = dict()
+    _limits: dict[str, int] = {}
+
+    def __init__(self, key: str, limit: int):
+        if key not in self._semaphores:
+            self._semaphores[key] = asyncio.BoundedSemaphore(limit)
+            self._limits[key] = limit
+        elif self._limits.get(key) != limit:
+            raise ValueError(f"Key '{key}' already initialized with limit={self._limits[key]}, got {limit}")
+        self._semaphore = self._semaphores[key]
+
+    async def __aenter__(self):
+        await self._semaphore.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self._semaphore.release()
 
 
 class Communicator:
@@ -265,7 +349,8 @@ class Communicator:
         """
         auth_token = auth_token or Authorization().get_access_token()
         headers = Communicator._create_headers(auth_token)
-        response = requests.get(url, params=params, headers=headers)
+        with ConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
+            response = requests.get(url, params=params, headers=headers)
         Communicator._check_response_status_code(response)
         return response.json()
 
@@ -290,7 +375,8 @@ class Communicator:
         # In contrast to requests.get(), it doesn’t clean up the final URL from parameters whose values are None
         params_cleaned = {k: v for k, v in params.items() if v is not None}
         async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.get(url, params=params_cleaned, headers=headers)
+            async with AsyncConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
+                response = await client.get(url, params=params_cleaned, headers=headers)
         Communicator._check_response_status_code(response)
         return response.json()
 
@@ -313,7 +399,8 @@ class Communicator:
         """
         auth_token = auth_token or Authorization().get_access_token()
         headers = Communicator._create_headers(auth_token)
-        response = requests.post(url, params=params, headers=headers, json=payload)
+        with ConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
+            response = requests.post(url, params=params, headers=headers, json=payload)
         Communicator._check_response_status_code(response)
         return response.json()
 
@@ -338,7 +425,8 @@ class Communicator:
         auth_token = auth_token or await Authorization().aget_access_token()
         headers = Communicator._create_headers(auth_token)
         async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(url, params=params, headers=headers, json=payload)
+            async with AsyncConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
+                response = await client.post(url, params=params, headers=headers, json=payload)
         Communicator._check_response_status_code(response)
         return response.json()
 
@@ -363,11 +451,12 @@ class Communicator:
         steaming_header = {'Prefer': 'streaming'}
         auth_token = auth_token or Authorization().get_access_token()
         headers = Communicator._create_headers(auth_token, additional_headers=[steaming_header])
-        with requests.get(url, params=params, headers=headers, stream=True, timeout=(5, None)) as stream:
-            Communicator._check_response_status_code(stream)
-            stream.raw.decode_content = True
-            for obj in ijson.items(stream.raw, 'item'):
-                yield Communicator._convert_values(obj)
+        with ConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
+            with requests.get(url, params=params, headers=headers, stream=True, timeout=(5, None)) as stream:
+                Communicator._check_response_status_code(stream)
+                stream.raw.decode_content = True
+                for obj in ijson.items(stream.raw, 'item'):
+                    yield Communicator._convert_values(obj)
 
     @staticmethod
     async def steaming_get_generator_async(
@@ -396,10 +485,11 @@ class Communicator:
         headers = Communicator._create_headers(auth_token)
         timeout = aiohttp.ClientTimeout(total=None)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url, params=params, headers=headers) as stream:
-                Communicator._check_response_status_code(stream)
-                async for obj in ijson.items(stream.content, 'item'):
-                    yield Communicator._convert_values(obj)
+            async with AsyncConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
+                async with session.get(url, params=params, headers=headers) as stream:
+                    Communicator._check_response_status_code(stream)
+                    async for obj in ijson.items(stream.content, 'item'):
+                        yield Communicator._convert_values(obj)
 
     @staticmethod
     def websocket_generator(
@@ -433,29 +523,30 @@ class Communicator:
         ws = WebSocket(skip_utf8_validation=True)
         # Use unlimited timeout (blocking). Users can wrap this in their own timeout logic if needed.
         try:
-            ws.connect(full_url, header=header_list)
-            i = 0
-            while True:
-                data = ws.recv()
-                i += 1
-                if data is None:
-                    break
-                if isinstance(data, str):
-                    # Sometimes we receive messages that contain an empty string. Let's just skip them.
-                    if data == "":
+            with ConcurrencyLimiter(full_url, MAX_CONCURRENT_CALLS_TO_WEBSOCKET):
+                ws.connect(full_url, header=header_list)
+                i = 0
+                while True:
+                    data = ws.recv()
+                    i += 1
+                    if data is None:
+                        break
+                    if isinstance(data, str):
+                        # Sometimes we receive messages that contain an empty string. Let's just skip them.
+                        if data == "":
+                            continue
+                        data = json.loads(data)
+                    if data is None:
                         continue
-                    data = json.loads(data)
-                if data is None:
-                    continue
-                if get_nested_key is not None:
-                    data = data[get_nested_key]
-                if isinstance(data, list):
-                    for item in data:
-                        yield item
-                else:
-                    yield data
-                if ack_message and (i % ack_after) == 0:
-                    ws.send(json.dumps(ack_message))
+                    if get_nested_key is not None:
+                        data = data[get_nested_key]
+                    if isinstance(data, list):
+                        for item in data:
+                            yield item
+                    else:
+                        yield data
+                    if ack_message and (i % ack_after) == 0:
+                        ws.send(json.dumps(ack_message))
 
         except WebSocketConnectionClosedException:
             # Gracefully stop iteration when the server closes the connection
@@ -504,51 +595,53 @@ class Communicator:
         timeout = aiohttp.ClientTimeout(total=None)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             ws = None
+            full_url = Communicator._add_query_params(url, params)
             try:
-                async with session.ws_connect(url, headers=headers, params=params) as ws:
-                    i = 0
-                    while True:
-                        msg = await ws.receive()
-                        i += 1
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            data = msg.data
-                            if isinstance(data, str):
-                                # Sometimes we receive messages that contain an empty string. Let's just skip them.
-                                if data == "":
+                async with AsyncConcurrencyLimiter(full_url, MAX_CONCURRENT_CALLS_TO_WEBSOCKET):
+                    async with session.ws_connect(url, headers=headers, params=params) as ws:
+                        i = 0
+                        while True:
+                            msg = await ws.receive()
+                            i += 1
+                            if msg.type == aiohttp.WSMsgType.TEXT:
+                                data = msg.data
+                                if isinstance(data, str):
+                                    # Sometimes we receive messages that contain an empty string. Let's just skip them.
+                                    if data == "":
+                                        continue
+                                    data = json.loads(data)
+                                if data is None:
                                     continue
-                                data = json.loads(data)
-                            if data is None:
-                                continue
-                            if get_nested_key is not None:
-                                # Only attempt to parse JSON and extract when a nested key is requested
-                                data = data[get_nested_key]
-                            if isinstance(data, list):
-                                for item in data:
-                                    yield item
-                            else:
-                                yield data
-                            if ack_message and (i % ack_after) == 0:
-                                try:
-                                    await ws.send_json(ack_message)
-                                except Exception:
-                                    # If sending ACK fails (e.g., during shutdown), we just stop gracefully
-                                    break
-                        elif msg.type == aiohttp.WSMsgType.BINARY:
-                            yield msg.data
-                            if ack_message and (i % ack_after) == 0:
-                                try:
-                                    await ws.send_json(ack_message)
-                                except Exception:
-                                    break
-                        elif msg.type in (
-                            aiohttp.WSMsgType.CLOSE,
-                            aiohttp.WSMsgType.CLOSING,
-                            aiohttp.WSMsgType.CLOSED,
-                        ):
-                            break
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
-                            raise WebsocketError()
-                        # Ignore other control frames implicitly
+                                if get_nested_key is not None:
+                                    # Only attempt to parse JSON and extract when a nested key is requested
+                                    data = data[get_nested_key]
+                                if isinstance(data, list):
+                                    for item in data:
+                                        yield item
+                                else:
+                                    yield data
+                                if ack_message and (i % ack_after) == 0:
+                                    try:
+                                        await ws.send_json(ack_message)
+                                    except Exception:
+                                        # If sending ACK fails (e.g., during shutdown), we just stop gracefully
+                                        break
+                            elif msg.type == aiohttp.WSMsgType.BINARY:
+                                yield msg.data
+                                if ack_message and (i % ack_after) == 0:
+                                    try:
+                                        await ws.send_json(ack_message)
+                                    except Exception:
+                                        break
+                            elif msg.type in (
+                                aiohttp.WSMsgType.CLOSE,
+                                aiohttp.WSMsgType.CLOSING,
+                                aiohttp.WSMsgType.CLOSED,
+                            ):
+                                break
+                            elif msg.type == aiohttp.WSMsgType.ERROR:
+                                raise WebsocketError()
+                            # Ignore other control frames implicitly
 
             except asyncio.CancelledError:
                 # Propagate cancellation after letting context managers attempt a clean shutdown
