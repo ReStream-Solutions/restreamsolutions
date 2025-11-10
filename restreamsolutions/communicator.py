@@ -461,6 +461,7 @@ class Communicator:
         Communicator._check_response_status_code(response)
         return response.json()
 
+    # The retry logic is implemented in Data._wrapper.
     @staticmethod
     def steaming_get_generator(url: str, auth_token: str = None, **params) -> Generator[dict, dict, None]:
         """Stream a JSON array from a GET endpoint synchronously.
@@ -489,6 +490,7 @@ class Communicator:
                 for obj in ijson.items(stream.raw, 'item'):
                     yield Communicator._convert_values(obj)
 
+    # The retry logic is implemented in DataAsync._wrapper.
     @staticmethod
     async def steaming_get_generator_async(
         url: str, auth_token: str = None, **params

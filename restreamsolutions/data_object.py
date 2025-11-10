@@ -3,6 +3,7 @@ import json
 import time
 import warnings
 from typing import Generator, AsyncGenerator, Callable, Any
+import random
 from pathlib import Path
 
 import aiofiles
@@ -72,6 +73,11 @@ class Data(BaseData):
         restart_on_close: bool = False,
         convert_to: Any = None,
         auth_token: str = None,
+        *,
+        attempts: int | None = None,
+        initial_delay: float = 1,
+        factor: float = 4.0,
+        jitter: bool = True,
     ) -> None:
         """Initialize the Data wrapper.
 
@@ -85,12 +91,26 @@ class Data(BaseData):
             restart_on_close: If True, the wrapper will also recreate the underlying generator
                 when it completes normally (e.g., a WebSocket closes cleanly) and continue
                 streaming. If False, normal completion will finish the stream.
+            attempts: If None (default), restarts happen indefinitely with a fixed wait of ``initial_delay`` seconds.
+                If a number is provided, use exponential backoff with the given number of attempts (like the decorator):
+                wait ``initial_delay`` before the first retry, then multiply by ``factor`` after each retry and stop
+                after attempts are exhausted.
+            initial_delay: Base delay in seconds before the first retry.
+            factor: Multiplier for exponential backoff when attempts is a number.
+            jitter: If True, applies uniform randomization to each wait in the range [delay/2, delay*1.5]
+                when attempts is a number; ignored when attempts is None (fixed delay).
         """
         self._data_generator_factory = data_generator_factory
         self._restart_on_error = restart_on_error
         self._restart_on_close = restart_on_close
         self._convert_to = convert_to
         self._auth_token = auth_token
+        if attempts is not None and attempts < 1:
+            raise ValueError("attempts must be >= 1 or None")
+        self._attempts = attempts
+        self._initial_delay = initial_delay
+        self._factor = factor
+        self._jitter = jitter
 
     @property
     def data_fetcher(self) -> Generator[dict, None, None]:
@@ -121,6 +141,10 @@ class Data(BaseData):
         """
 
         def _wrapper():
+            finite_attempts = self._attempts is not None
+            attempts_left = self._attempts if finite_attempts else None
+            delay = self._initial_delay
+
             while True:
                 gen = self._data_generator_factory()
                 try:
@@ -140,9 +164,22 @@ class Data(BaseData):
                 except Exception as e:
                     if not self._restart_on_error:
                         raise
-                    # else: recreate and continue loop
-                    warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
-                    time.sleep(1)
+                    # We should restart on error: check attempts policy
+                    if finite_attempts:
+                        attempts_left -= 1
+                        if attempts_left <= 0:
+                            raise
+                        sleep_delay = random.uniform(delay / 2, delay * 1.5) if self._jitter else delay
+                        warnings.warn(
+                            f"Got exception: {e}, reconnecting, retry in {sleep_delay} seconds", RuntimeWarning
+                        )
+                        time.sleep(sleep_delay)
+                        delay *= self._factor
+                    else:
+                        warnings.warn(
+                            f"Got exception: {e}, reconnecting, retry in {self._initial_delay} seconds", RuntimeWarning
+                        )
+                        time.sleep(self._initial_delay)
                     continue
                 warnings.warn(f"The connection was closed. Reconnecting", RuntimeWarning)
 
@@ -231,6 +268,11 @@ class DataAsync(BaseData):
         restart_on_close: bool = False,
         convert_to: Any = None,
         auth_token: str = None,
+        *,
+        attempts: int | None = None,
+        initial_delay: float = 1,
+        factor: float = 4.0,
+        jitter: bool = True,
     ) -> None:
         """Initialize the asynchronous Data wrapper.
 
@@ -244,12 +286,26 @@ class DataAsync(BaseData):
             restart_on_close: If True, the wrapper will also recreate the underlying async generator
                 when it completes normally (e.g., a WebSocket closes cleanly) and continue
                 streaming. If False, normal completion will finish the stream.
+            attempts: If None (default), restarts happen indefinitely with a fixed wait of ``initial_delay`` seconds.
+                If a number is provided, use exponential backoff with the given number of attempts (like the decorator):
+                wait ``initial_delay`` before the first retry, then multiply by ``factor`` after each retry and stop
+                after attempts are exhausted.
+            initial_delay: Base delay in seconds before the first retry.
+            factor: Multiplier for exponential backoff when attempts is a number.
+            jitter: If True, applies uniform randomization to each wait in the range [delay/2, delay*1.5]
+                when attempts is a number; ignored when attempts is None (fixed delay).
         """
         self._data_generator_factory = data_generator_factory
         self._restart_on_error = restart_on_error
         self._restart_on_close = restart_on_close
         self._convert_to = convert_to
         self._auth_token = auth_token
+        if attempts is not None and attempts < 1:
+            raise ValueError("attempts must be >= 1 or None")
+        self._attempts = attempts
+        self._initial_delay = initial_delay
+        self._factor = factor
+        self._jitter = jitter
 
     @property
     def data_fetcher(self) -> AsyncGenerator[dict, None]:
@@ -278,6 +334,10 @@ class DataAsync(BaseData):
         """
 
         async def _wrapper():
+            finite_attempts = self._attempts is not None
+            attempts_left = self._attempts if finite_attempts else None
+            delay = self._initial_delay
+
             while True:
                 agen = self._data_generator_factory()
                 try:
@@ -297,9 +357,23 @@ class DataAsync(BaseData):
                 except Exception as e:
                     if not self._restart_on_error:
                         raise
-                    # else: recreate and continue loop
-                    warnings.warn(f"Got exception: {e}, reconnecting...", RuntimeWarning)
-                    await asyncio.sleep(1)
+
+                    # We should restart on error: check attempts policy
+                    if finite_attempts:
+                        attempts_left -= 1
+                        if attempts_left <= 0:
+                            raise
+                        sleep_delay = random.uniform(delay / 2, delay * 1.5) if self._jitter else delay
+                        warnings.warn(
+                            f"Got exception: {e}, reconnecting, retry in {sleep_delay} seconds", RuntimeWarning
+                        )
+                        await asyncio.sleep(sleep_delay)
+                        delay *= self._factor
+                    else:
+                        warnings.warn(
+                            f"Got exception: {e}, reconnecting, retry in {self._initial_delay} seconds", RuntimeWarning
+                        )
+                        await asyncio.sleep(self._initial_delay)
                     continue
                 finally:
                     # Ensure the underlying async generator is properly closed when the

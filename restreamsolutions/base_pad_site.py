@@ -377,7 +377,7 @@ class BasePadSite(BaseInterface):
         url = self._format_url(self._api_url_data, id=self.id)
         params = self._build_get_data_params(**filters)
         data_generator_factory = lambda: Communicator.steaming_get_generator(url, self._auth_token, **params)
-        return Data(data_generator_factory)
+        return Data(data_generator_factory, restart_on_error=True, attempts=5)
 
     async def aget_data(self, **filters: dict) -> DataAsync:
         """Return a DataAsync object that streams data records asynchronously.
@@ -391,7 +391,7 @@ class BasePadSite(BaseInterface):
         url = self._format_url(self._api_url_data, id=self.id)
         params = self._build_get_data_params(**filters)
         data_generator_factory = lambda: Communicator.steaming_get_generator_async(url, self._auth_token, **params)
-        return DataAsync(data_generator_factory)
+        return DataAsync(data_generator_factory, restart_on_error=True, attempts=5)
 
     def get_data_changes(self, as_dict: bool = False, **filters: dict) -> tuple[list[dict | DataChanges], Data]:
         """Fetch all data change events for the current object (Site or Pad) and a Data object
@@ -515,6 +515,7 @@ class BasePadSite(BaseInterface):
                 data_generator_factory,
                 restart_on_error=restart_on_error,
                 restart_on_close=restart_on_close,
+                attempts=None,
             ),
             system_params['session_key'],
         )
@@ -552,6 +553,7 @@ class BasePadSite(BaseInterface):
                 data_generator_factory,
                 restart_on_error=restart_on_error,
                 restart_on_close=restart_on_close,
+                attempts=None,
             ),
             system_params['session_key'],
         )
@@ -572,6 +574,7 @@ class BasePadSite(BaseInterface):
             restart_on_error=restart_on_error,
             restart_on_close=restart_on_close,
             auth_token=self._auth_token,
+            attempts=None,
         )
 
     async def _aget_real_time_updates_object(
@@ -590,6 +593,7 @@ class BasePadSite(BaseInterface):
             restart_on_error=restart_on_error,
             restart_on_close=restart_on_close,
             auth_token=self._auth_token,
+            attempts=None,
         )
 
     def get_realtime_instance_updates(
