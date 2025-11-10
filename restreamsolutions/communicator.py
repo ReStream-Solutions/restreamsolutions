@@ -10,6 +10,7 @@ from decimal import Decimal
 from json import JSONDecodeError
 from typing import Generator, Any, AsyncGenerator, Optional, Iterable, Dict, List, Tuple
 import warnings
+import random
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 import aiohttp
@@ -33,7 +34,9 @@ from .exceptions import (
 from .utils.singleton import Singleton
 
 
-def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float = 1, factor: float = 4.0):
+def exponential_backoff(
+    _func=None, *, attempts: int = 4, initial_delay: float = 1, factor: float = 4.0, jitter: bool = True
+):
     """A decorator that retries a function with exponential backoff on exceptions.
 
     Supports both synchronous and asynchronous functions. Will not retry on
@@ -48,6 +51,7 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
         attempts: Total number of attempts to try (including the first call).
         initial_delay: Delay before the first retry in seconds.
         factor: Multiplier applied to the delay after each failed attempt.
+        jitter: If True (default), each wait is randomized uniformly in [delay / 2, delay * 1.5]. If False, waits are fixed.
     """
 
     def decorator(func):
@@ -84,7 +88,8 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
                             f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
                             RuntimeWarning,
                         )
-                    await asyncio.sleep(delay)
+                    sleep_delay = random.uniform(delay / 2, delay * 1.5) if jitter else delay
+                    await asyncio.sleep(sleep_delay)
                     delay *= factor
 
         @functools.wraps(func)
@@ -113,7 +118,8 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
                             f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
                             RuntimeWarning,
                         )
-                    time.sleep(delay)
+                    sleep_delay = random.uniform(delay / 2, delay * 1.5) if jitter else delay
+                    time.sleep(sleep_delay)
                     delay *= factor
 
         return async_wrapper if is_coro else sync_wrapper
