@@ -8,7 +8,7 @@ from pathlib import Path
 import aiofiles
 import pandas as pd
 
-from restreamsolutions.exceptions import APICompatibilityError, APIConcurrencyLimitError, CredentialsError
+from restreamsolutions.exceptions import APICompatibilityError, CredentialsError
 
 
 class BaseData:
@@ -134,7 +134,7 @@ class Data(BaseData):
                             yield item
                     if not self._restart_on_close:
                         break  # normal completion
-                except (CredentialsError, APICompatibilityError, APIConcurrencyLimitError):
+                except (CredentialsError, APICompatibilityError):
                     # Do not retry on these errors
                     raise
                 except Exception as e:
@@ -291,7 +291,7 @@ class DataAsync(BaseData):
                             yield item
                     if not self._restart_on_close:
                         break  # normal completion
-                except (CredentialsError, APICompatibilityError, APIConcurrencyLimitError):
+                except (CredentialsError, APICompatibilityError):
                     # Do not retry on these errors
                     raise
                 except Exception as e:

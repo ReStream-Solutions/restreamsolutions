@@ -35,12 +35,12 @@ from .utils.singleton import Singleton
 
 
 def exponential_backoff(
-    _func=None, *, attempts: int = 4, initial_delay: float = 1, factor: float = 4.0, jitter: bool = True
+    _func=None, *, attempts: int = 5, initial_delay: float = 1, factor: float = 4.0, jitter: bool = True
 ):
     """A decorator that retries a function with exponential backoff on exceptions.
 
     Supports both synchronous and asynchronous functions. Will not retry on
-    AuthError, APICompatibilityError, or APIConcurrencyLimitError, propagating
+    AuthError, APICompatibilityError, propagating
     them immediately.
 
     Can be used with or without parameters:
@@ -68,7 +68,7 @@ def exponential_backoff(
             for i in range(effective_attempts):
                 try:
                     return await func(*args, **kwargs)
-                except (CredentialsError, APICompatibilityError, APIConcurrencyLimitError):
+                except (CredentialsError, APICompatibilityError):
                     # Do not retry on these errors
                     raise
                 except (AuthError, Exception) as e:
@@ -98,7 +98,7 @@ def exponential_backoff(
             for i in range(effective_attempts):
                 try:
                     return func(*args, **kwargs)
-                except (CredentialsError, APICompatibilityError, APIConcurrencyLimitError):
+                except (CredentialsError, APICompatibilityError):
                     # Do not retry on these errors
                     raise
                 except (AuthError, Exception) as e:
