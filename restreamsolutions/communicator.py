@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import threading
 import time
 import functools
@@ -124,7 +125,17 @@ def exponential_backoff(_func=None, *, attempts: int = 4, initial_delay: float =
         return decorator(_func)
 
 
-class ConcurrencyLimiter:
+class BaseConcurrencyLimiter:
+    def __init__(self, key: str, limit: int, with_id_in_url: bool = False):
+        self._key = key if with_id_in_url else self._replace_numbers(key)
+        self._limit = limit
+
+    @staticmethod
+    def _replace_numbers(key: str) -> str:
+        return re.sub(r'\d+', '$', key)
+
+
+class ConcurrencyLimiter(BaseConcurrencyLimiter):
     """Thread-safe context manager to limit concurrent sync calls per key.
 
     Purpose:
@@ -137,10 +148,6 @@ class ConcurrencyLimiter:
         - Subsequent initializations for the same key must pass the same limit, otherwise a ValueError is raised.
         - Entering the context acquires a slot; exiting releases it.
 
-    Parameters:
-        key: A stable identifier that groups calls sharing the same limit (typically, a full request URL or endpoint).
-        limit: Maximum number of concurrent calls allowed for the given key.
-
     Usage:
         with ConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
             response = requests.get(url, ...)
@@ -150,14 +157,26 @@ class ConcurrencyLimiter:
     _limits: dict[str, int] = {}
     _lock = threading.Lock()
 
-    def __init__(self, key: str, limit: int):
+    def __init__(self, key: str, limit: int, with_id_in_url: bool = False):
+        """Initialize the concurrency limiter for a specific key.
+
+        Parameters:
+            key: A stable identifier that groups calls sharing the same limit (e.g., full request URL or endpoint).
+            limit: Maximum number of concurrent sync calls allowed for the given key.
+            with_id_in_url: If False (default), any sequences of digits in the key are replaced with '$' so that
+                requests to the same endpoint but with different numeric IDs share one semaphore. If True, the key
+                is used as-is which creates separate semaphores per distinct numeric ID in the URL.
+        """
+        super().__init__(key, limit, with_id_in_url)
         with self._lock:
-            if key not in self._semaphores:
-                self._semaphores[key] = threading.BoundedSemaphore(limit)
-                self._limits[key] = limit
-            elif self._limits.get(key) != limit:
-                raise ValueError(f"Key '{key}' already initialized with limit={self._limits[key]}, got {limit}")
-        self._semaphore = self._semaphores[key]
+            if self._key not in self._semaphores:
+                self._semaphores[self._key] = threading.BoundedSemaphore(limit)
+                self._limits[self._key] = limit
+            elif self._limits.get(self._key) != limit:
+                raise ValueError(
+                    f"Key '{self._key}' already initialized with limit={self._limits[self._key]}, got {limit}"
+                )
+        self._semaphore = self._semaphores[self._key]
 
     def __enter__(self):
         self._semaphore.acquire()
@@ -167,7 +186,7 @@ class ConcurrencyLimiter:
         self._semaphore.release()
 
 
-class AsyncConcurrencyLimiter:
+class AsyncConcurrencyLimiter(BaseConcurrencyLimiter):
     """Async context manager to limit concurrent async calls per key.
 
     Purpose:
@@ -180,25 +199,31 @@ class AsyncConcurrencyLimiter:
         - Subsequent initializations for the same key must pass the same limit, otherwise a ValueError is raised.
         - Entering the async context awaits a slot; exiting releases it.
 
-    Parameters:
-        key: A stable identifier that groups calls sharing the same limit (typically, a full request URL or endpoint).
-        limit: Maximum number of concurrent async calls allowed for the given key.
-
     Usage:
         async with AsyncConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):
             response = await client.get(url, ...)
     """
 
-    _semaphores: dict[str, asyncio.BoundedSemaphore] = dict()
+    _semaphores: dict[str, asyncio.BoundedSemaphore] = {}
     _limits: dict[str, int] = {}
 
-    def __init__(self, key: str, limit: int):
-        if key not in self._semaphores:
-            self._semaphores[key] = asyncio.BoundedSemaphore(limit)
-            self._limits[key] = limit
-        elif self._limits.get(key) != limit:
-            raise ValueError(f"Key '{key}' already initialized with limit={self._limits[key]}, got {limit}")
-        self._semaphore = self._semaphores[key]
+    def __init__(self, key: str, limit: int, with_id_in_url: bool = False):
+        """Initialize the async concurrency limiter for a specific key.
+
+        Parameters:
+            key: A stable identifier that groups calls sharing the same limit (e.g., full request URL or endpoint).
+            limit: Maximum number of concurrent async calls allowed for the given key.
+            with_id_in_url: If False (default), any sequences of digits in the key are replaced with '$' so that
+                requests to the same endpoint but with different numeric IDs share one semaphore. If True, the key
+                is used as-is which creates separate semaphores per distinct numeric ID in the URL.
+        """
+        super().__init__(key, limit, with_id_in_url)
+        if self._key not in self._semaphores:
+            self._semaphores[self._key] = asyncio.BoundedSemaphore(limit)
+            self._limits[self._key] = limit
+        elif self._limits.get(self._key) != limit:
+            raise ValueError(f"Key '{self._key}' already initialized with limit={self._limits[self._key]}, got {limit}")
+        self._semaphore = self._semaphores[self._key]
 
     async def __aenter__(self):
         await self._semaphore.acquire()
@@ -523,7 +548,8 @@ class Communicator:
         ws = WebSocket(skip_utf8_validation=True)
         # Use unlimited timeout (blocking). Users can wrap this in their own timeout logic if needed.
         try:
-            with ConcurrencyLimiter(full_url, MAX_CONCURRENT_CALLS_TO_WEBSOCKET):
+            # We use with_id_in_url = True, so URLs with different pad/site IDs will have independent limits.
+            with ConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_WEBSOCKET, with_id_in_url=True):
                 ws.connect(full_url, header=header_list)
                 i = 0
                 while True:
@@ -595,9 +621,9 @@ class Communicator:
         timeout = aiohttp.ClientTimeout(total=None)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             ws = None
-            full_url = Communicator._add_query_params(url, params)
             try:
-                async with AsyncConcurrencyLimiter(full_url, MAX_CONCURRENT_CALLS_TO_WEBSOCKET):
+                # We use with_id_in_url = True, so URLs with different pad/site IDs will have independent limits.
+                async with AsyncConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_WEBSOCKET, with_id_in_url=True):
                     async with session.ws_connect(url, headers=headers, params=params) as ws:
                         i = 0
                         while True:
