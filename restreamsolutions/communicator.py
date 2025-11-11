@@ -39,9 +39,16 @@ def exponential_backoff(
 ):
     """A decorator that retries a function with exponential backoff on exceptions.
 
-    Supports both synchronous and asynchronous functions. Will not retry on
-    AuthError, APICompatibilityError, propagating
-    them immediately.
+    Supports both synchronous and asynchronous functions.
+
+    Retry policy:
+    - AuthError: retried only if the target function was NOT passed an auth_token explicitly
+      (i.e., no explicit auth_token argument). If an explicit token was provided, the error
+      is propagated immediately without retry.
+    - CredentialsError and APICompatibilityError: never retried; propagated immediately.
+    - Any other Exception: retried with exponential backoff.
+
+    During pytest runs, retries are disabled (attempts forced to 1) to speed up tests.
 
     Can be used with or without parameters:
         @exponential_backoff
@@ -66,61 +73,65 @@ def exponential_backoff(
         async def async_wrapper(*args, **kwargs):
             delay = initial_delay
             for i in range(effective_attempts):
+                sleep_delay = random.uniform(max(delay / 2, 1), delay * 1.5) if jitter else delay
                 try:
                     return await func(*args, **kwargs)
                 except (CredentialsError, APICompatibilityError):
                     # Do not retry on these errors
                     raise
-                except (AuthError, Exception) as e:
+                except AuthError:
+                    # If a token is provided explicitly, we can't regenerate it
+                    if kwargs.get('auth_token') is not None or i == effective_attempts - 1:
+                        raise
+                    warnings.warn(
+                        f'Authorization failed for {func.__name__}. Requesting a new access token, '
+                        f'retry after {sleep_delay:.2f} seconds.',
+                        RuntimeWarning,
+                    )
+                    # Recreates auth token in the Authorization singleton class
+                    # Never raise the AuthError within the Authorization class to avoid recursion!
+                    await Authorization().aget_access_token(force=True)
+                except Exception as e:
                     if i == effective_attempts - 1:
                         raise
-                    if isinstance(e, AuthError):
-                        warnings.warn(
-                            f'Authorization failed for {func.__name__}. '
-                            f'Requesting a new access token and retrying after {delay} seconds.',
-                            RuntimeWarning,
-                        )
-                        # Recreates auth token in the Authorization singleton class
-                        # Never raise the AuthError within the Authorization class to avoid recursion!
-                        await Authorization().aget_access_token(force=True)
-                    else:
-                        warnings.warn(
-                            f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
-                            RuntimeWarning,
-                        )
-                    sleep_delay = random.uniform(delay / 2, delay * 1.5) if jitter else delay
-                    await asyncio.sleep(sleep_delay)
-                    delay *= factor
+                    warnings.warn(
+                        f"Unexpected exception raised by {func.__name__}: {e}, retry after {sleep_delay:.2f} seconds.",
+                        RuntimeWarning,
+                    )
+                await asyncio.sleep(sleep_delay)
+                delay *= factor
 
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
             delay = initial_delay
             for i in range(effective_attempts):
+                sleep_delay = random.uniform(max(delay / 2, 1), delay * 1.5) if jitter else delay
                 try:
                     return func(*args, **kwargs)
                 except (CredentialsError, APICompatibilityError):
                     # Do not retry on these errors
                     raise
-                except (AuthError, Exception) as e:
+                except AuthError:
+                    # If a token is provided explicitly, we can't regenerate it
+                    if kwargs.get('auth_token') is not None or i == effective_attempts - 1:
+                        raise
+                    warnings.warn(
+                        f'Authorization failed for {func.__name__}. Requesting a new access token, '
+                        f'retry after {sleep_delay:.2f} seconds.',
+                        RuntimeWarning,
+                    )
+                    # Recreates auth token in the Authorization singleton class
+                    # Never raise the AuthError within the Authorization class to avoid recursion!
+                    Authorization().get_access_token(force=True)
+                except Exception as e:
                     if i == effective_attempts - 1:
                         raise
-                    if isinstance(e, AuthError):
-                        warnings.warn(
-                            f'Authorization failed for {func.__name__}. '
-                            f'Requesting a new access token and retrying after {delay} seconds.',
-                            RuntimeWarning,
-                        )
-                        # Recreates auth token in the Authorization singleton class
-                        # Never raise the AuthError within the Authorization class to avoid recursion!
-                        Authorization().get_access_token(force=True)
-                    else:
-                        warnings.warn(
-                            f"Unexpected exception raised by {func.__name__}: {e}, retry after {delay} seconds.",
-                            RuntimeWarning,
-                        )
-                    sleep_delay = random.uniform(delay / 2, delay * 1.5) if jitter else delay
-                    time.sleep(sleep_delay)
-                    delay *= factor
+                    warnings.warn(
+                        f"Unexpected exception raised by {func.__name__}: {e}, retry after {sleep_delay:.2f} seconds.",
+                        RuntimeWarning,
+                    )
+                time.sleep(sleep_delay)
+                delay *= factor
 
         return async_wrapper if is_coro else sync_wrapper
 

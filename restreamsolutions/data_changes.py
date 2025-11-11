@@ -135,7 +135,7 @@ class DataChanges(BaseInterface):
         event associated with the instance has already been confirmed.
         """
         url = self._build_url()
-        response_data = Communicator.send_get_request(url, self._auth_token)
+        response_data = Communicator.send_get_request(url, auth_token=self._auth_token)
         self._update_self_state(response_data)
 
     async def aupdate(self):
@@ -146,7 +146,7 @@ class DataChanges(BaseInterface):
         event associated with the instance has already been confirmed.
         """
         url = self._build_url()
-        response_data = await Communicator.send_get_request_async(url, self._auth_token)
+        response_data = await Communicator.send_get_request_async(url, auth_token=self._auth_token)
         self._update_self_state(response_data)
 
     def get_data(self) -> 'Data':
@@ -210,7 +210,7 @@ class DataChanges(BaseInterface):
             return True
         payload = self._create_confirm_data_received_payload()
         url = self._build_url()
-        response_data = Communicator.send_post_request(url, payload, self._auth_token)
+        response_data = Communicator.send_post_request(url, payload, auth_token=self._auth_token)
         self._update_self_state(response_data)
         return self.update_received
 
@@ -230,7 +230,7 @@ class DataChanges(BaseInterface):
             return True
         payload = self._create_confirm_data_received_payload()
         url = self._build_url()
-        response_data = await Communicator.send_post_request_async(url, payload, self._auth_token)
+        response_data = await Communicator.send_post_request_async(url, payload, auth_token=self._auth_token)
         self._update_self_state(response_data)
         return self.update_received
 

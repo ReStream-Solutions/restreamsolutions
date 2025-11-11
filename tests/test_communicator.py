@@ -166,7 +166,7 @@ def test_send_get_request_success(monkeypatch):
         ),
     )
 
-    out = Communicator.send_get_request(url, token, q="x")
+    out = Communicator.send_get_request(url, auth_token=token, q="x")
     assert out == payload
 
 
@@ -177,7 +177,7 @@ def test_send_get_request_auth_error(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
 
     with pytest.raises(AuthError):
-        Communicator.send_get_request("https://e", "tok")
+        Communicator.send_get_request("https://e", auth_token="tok")
 
 
 def test_send_get_request_not_found(monkeypatch):
@@ -187,7 +187,7 @@ def test_send_get_request_not_found(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
 
     with pytest.raises(APICompatibilityError):
-        Communicator.send_get_request("https://e", "tok")
+        Communicator.send_get_request("https://e", auth_token="tok")
 
 
 def test_send_get_request_rate_limited(monkeypatch):
@@ -197,7 +197,7 @@ def test_send_get_request_rate_limited(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
 
     with pytest.raises(APIConcurrencyLimitError):
-        Communicator.send_get_request("https://e", "tok")
+        Communicator.send_get_request("https://e", auth_token="tok")
 
 
 def test_send_get_request_other_error(monkeypatch):
@@ -208,7 +208,7 @@ def test_send_get_request_other_error(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
 
     with pytest.raises(ServerError):
-        Communicator.send_get_request("https://e", "tok")
+        Communicator.send_get_request("https://e", auth_token="tok")
 
 
 # ------------------------
@@ -232,7 +232,7 @@ def test_send_post_request_success(monkeypatch):
         ),
     )
 
-    out = Communicator.send_post_request(url, {"name": "Bob"}, token)
+    out = Communicator.send_post_request(url, {"name": "Bob"}, auth_token=token)
     assert out == payload
 
 
@@ -251,7 +251,7 @@ def test_send_post_request_error_mapping(monkeypatch):
 
         monkeypatch.setattr(requests, "post", fake_post, raising=True)
         with pytest.raises(exc):
-            Communicator.send_post_request("https://e", {}, "tok")
+            Communicator.send_post_request("https://e", {}, auth_token="tok")
 
     # other error
     def fake_post_500(u, params=None, headers=None, json=None):
@@ -259,7 +259,7 @@ def test_send_post_request_error_mapping(monkeypatch):
 
     monkeypatch.setattr(requests, "post", fake_post_500)
     with pytest.raises(ServerError):
-        Communicator.send_post_request("https://e", {}, "tok")
+        Communicator.send_post_request("https://e", {}, auth_token="tok")
 
 
 # ------------------------
@@ -278,7 +278,7 @@ async def test_send_get_request_async_success(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(get_cb=get_cb))
 
-    out = await Communicator.send_get_request_async(url, token)
+    out = await Communicator.send_get_request_async(url, auth_token=token)
     assert out == payload
 
 
@@ -291,10 +291,10 @@ async def test_send_get_request_async_error_mapping(monkeypatch):
         monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(get_cb=get_cb))
         if expected_exc is None:
             with pytest.raises(httpx.HTTPStatusError):
-                await Communicator.send_get_request_async("https://e", "t")
+                await Communicator.send_get_request_async("https://e", auth_token="t")
         else:
             with pytest.raises(expected_exc):
-                await Communicator.send_get_request_async("https://e", "t")
+                await Communicator.send_get_request_async("https://e", auth_token="t")
 
     for status, exc in [
         (401, AuthError),
@@ -316,7 +316,7 @@ async def test_send_post_request_async_success(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(post_cb=post_cb))
 
-    out = await Communicator.send_post_request_async("https://e", {"n": 1}, "t")
+    out = await Communicator.send_post_request_async("https://e", {"n": 1}, auth_token="t")
     assert out == payload
 
 
@@ -329,10 +329,10 @@ async def test_send_post_request_async_error_mapping(monkeypatch):
         monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(post_cb=post_cb))
         if expected_exc is None:
             with pytest.raises(httpx.HTTPStatusError):
-                await Communicator.send_post_request_async("https://e", {}, "t")
+                await Communicator.send_post_request_async("https://e", {}, auth_token="t")
         else:
             with pytest.raises(expected_exc):
-                await Communicator.send_post_request_async("https://e", {}, "t")
+                await Communicator.send_post_request_async("https://e", {}, auth_token="t")
 
     for status, exc in [
         (401, AuthError),
