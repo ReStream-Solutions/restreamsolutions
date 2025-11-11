@@ -512,10 +512,8 @@ class Communicator:
             AuthError, APICompatibilityError, APIConcurrencyLimitError, HTTPError
         """
         auth_token = auth_token or await Authorization().aget_access_token()
-        # TODO: Fix the issue with receiving stream in the async mode
-        # steaming_header = {'Prefer': 'streaming'}
-        # headers = Communicator._create_headers(auth_token, additional_headers=[steaming_header])
-        headers = Communicator._create_headers(auth_token)
+        steaming_header = {'Prefer': 'streaming'}
+        headers = Communicator._create_headers(auth_token, additional_headers=[steaming_header])
         timeout = aiohttp.ClientTimeout(total=None)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with AsyncConcurrencyLimiter(url, MAX_CONCURRENT_CALLS_TO_ENDPOINT):

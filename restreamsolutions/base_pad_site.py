@@ -435,11 +435,7 @@ class BasePadSite(BaseInterface):
               - combined_data is a DataAsync object representing a concatenation of change intervals.
         """
         url = self._format_url(self._api_url_data_changes_multiple, parent_id=self.id)
-        # TODO: The response of this endpoint is of type "stream".
-        # We need to fix handling streaming data in async mode.
-        # In the meantime, we can use the synchronous method in a thread
-        sync_call = partial(Communicator.send_get_request, url, self._auth_token, **filters)
-        response = await asyncio.to_thread(sync_call)
+        response = await Communicator.send_get_request_async(url, self._auth_token, **filters)
         raw_changes: list[dict[str, Any]] = response.get('change_log', [])
 
         changes_list = DataChanges._build_multiple_from_response(
