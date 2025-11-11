@@ -1,4 +1,5 @@
 import asyncio
+import random
 import threading
 import time
 import uuid
@@ -10,8 +11,8 @@ from restreamsolutions.communicator import ConcurrencyLimiter, AsyncConcurrencyL
 
 
 def test_concurrency_limiter_enforces_limit_and_conflicting_limit_raises():
-    # Use a unique key to avoid interference with other tests/sessions
-    key = f"test-sync-{uuid.uuid4()}"
+    client_key = str(uuid.uuid4())
+    url_key_template = "http://example.com/{id}"
     limit = 3
 
     current = 0
@@ -20,7 +21,8 @@ def test_concurrency_limiter_enforces_limit_and_conflicting_limit_raises():
 
     def worker():
         nonlocal current, max_seen
-        with ConcurrencyLimiter(key, limit):
+        url_key = url_key_template.format(id=random.randint(1, 1000))
+        with ConcurrencyLimiter(url_key, client_key, limit):
             with lock:
                 current += 1
                 max_seen = max(max_seen, current)
@@ -38,15 +40,22 @@ def test_concurrency_limiter_enforces_limit_and_conflicting_limit_raises():
 
     # The limiter should prevent exceeding the limit
     assert max_seen <= limit
+
     # And re-initializing the same key with a different limit should raise
     with pytest.raises(ValueError):
-        ConcurrencyLimiter(key, limit + 1)
+        with ConcurrencyLimiter(url_key_template.format(id=1001), client_key, limit):
+            with ConcurrencyLimiter(url_key_template.format(id=1002), client_key, limit + 1):
+                pass
+
+    # All semaphores were deleted
+    assert ConcurrencyLimiter._semaphores == {}
 
 
 @pytest.mark.asyncio
 async def test_async_concurrency_limiter_enforces_limit_and_conflicting_limit_raises():
-    key = f"test-async-{uuid.uuid4()}"
-    limit = 4
+    client_key = str(uuid.uuid4())
+    url_key_template = "http://example.com/{id}"
+    limit = 3
 
     current = 0
     max_seen = 0
@@ -54,7 +63,8 @@ async def test_async_concurrency_limiter_enforces_limit_and_conflicting_limit_ra
 
     async def aworker():
         nonlocal current, max_seen
-        async with AsyncConcurrencyLimiter(key, limit):
+        url_key = url_key_template.format(id=random.randint(1, 1000))
+        async with AsyncConcurrencyLimiter(url_key, client_key, limit):
             async with lock:
                 current += 1
                 max_seen = max(max_seen, current)
@@ -68,4 +78,9 @@ async def test_async_concurrency_limiter_enforces_limit_and_conflicting_limit_ra
 
     assert max_seen <= limit
     with pytest.raises(ValueError):
-        AsyncConcurrencyLimiter(key, limit + 1)
+        async with AsyncConcurrencyLimiter(url_key_template.format(id=1001), client_key, limit):
+            async with AsyncConcurrencyLimiter(url_key_template.format(id=1002), client_key, limit + 1):
+                pass
+
+    # All semaphores were deleted
+    assert AsyncConcurrencyLimiter._semaphores == {}
