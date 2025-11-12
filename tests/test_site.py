@@ -607,14 +607,14 @@ async def test_site_aget_data_changes(monkeypatch):
 
     url_many = f"{RESTREAM_HOST}{ENDPOINTS.data_changes_site_many.value}".format(parent_id=site.id)
 
-    def fake_get(u, auth_token, **params):
+    async def fake_get(u, auth_token, **params):
         assert u == url_many
         assert auth_token == token
         if isinstance(many_payload, dict) and 'change_log' in many_payload:
             return many_payload
         return {'change_log': many_payload}
 
-    monkeypatch.setattr(Communicator, 'send_get_request', fake_get)
+    monkeypatch.setattr(Communicator, 'send_get_request_async', fake_get)
 
     changes, combined = await site.aget_data_changes(as_dict=True)
     assert isinstance(changes, list)
