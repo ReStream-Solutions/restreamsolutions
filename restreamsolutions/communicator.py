@@ -5,6 +5,7 @@ import threading
 import time
 import functools
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from json import JSONDecodeError
@@ -762,6 +763,17 @@ class Communicator:
                     pass
 
 
+@dataclass
+class RestreamToken:
+    token: str
+    expires_in: int
+    last_update: int
+
+    def is_expired(self) -> bool:
+        current_timestamp = datetime.now().timestamp()
+        return current_timestamp >= self.expires_in + self.last_update - 10
+
+
 class Authorization(metaclass=Singleton):
     """Handles ReStream OAuth2 client-credentials authentication and token caching.
 
@@ -776,11 +788,7 @@ class Authorization(metaclass=Singleton):
         """Initializes the token cache and concurrency primitives.
         This class is a singleton — the instance is created only once.
         """
-        self._restream_auth_token: Optional[str] = None
-        self._expires_in: int = 0
-        self._last_update: int = 0
-        self._sync_lock = threading.RLock()
-        self._async_lock = asyncio.Lock()
+        self._tokens: dict[str, RestreamToken] = {}
 
     @classmethod
     def _build_auth_url(cls) -> str:
@@ -789,7 +797,23 @@ class Authorization(metaclass=Singleton):
         path = cls._api_url_auth
         return f"{base_url}{path}"
 
-    def _create_payload(self, client_id: str = None, client_secret: str = None) -> dict:
+    @staticmethod
+    def _select_client_id_and_secret(client_id: str = None, client_secret: str = None) -> Tuple[str, str]:
+        """Pick client_id and client_secret from arguments or environment.
+
+        Parameters:
+            client_id: Optional explicit client ID. If not provided, reads RESTREAM_CLIENT_ID from env.
+            client_secret: Optional explicit client secret. If not provided, reads RESTREAM_CLIENT_SECRET from env.
+
+        Returns:
+            A tuple (client_id, client_secret) which may include None values if not set.
+        """
+        return (
+            client_id or os.environ.get("RESTREAM_CLIENT_ID"),
+            client_secret or os.environ.get("RESTREAM_CLIENT_SECRET"),
+        )
+
+    def _create_payload(self, client_id: str, client_secret: str) -> dict:
         """Build form payload for the client-credentials token request.
 
         Parameters:
@@ -800,10 +824,8 @@ class Authorization(metaclass=Singleton):
             Dict suitable for x-www-form-urlencoded POST body.
 
         Raises:
-            ValueError: If neither parameters nor environment variables provide credentials.
+            CredentialsError: If neither parameters nor environment variables provide credentials.
         """
-        client_id = client_id or os.environ.get("RESTREAM_CLIENT_ID")
-        client_secret = client_secret or os.environ.get("RESTREAM_CLIENT_SECRET")
         if not (client_id and client_secret):
             raise CredentialsError(
                 "Must provide client_id and client_secret via method parameters or RESTREAM_CLIENT_ID,"
@@ -816,7 +838,7 @@ class Authorization(metaclass=Singleton):
             'grant_type': 'client_credentials',
         }
 
-    def _parse_response(self, response: Any) -> Tuple[str, int]:
+    def _parse_response(self, response: requests.Response | httpx.Response) -> Tuple[str, int]:
         """Extract token and expiration from HTTP response JSON.
 
         Parameters:
@@ -837,16 +859,52 @@ class Authorization(metaclass=Singleton):
             raise APICompatibilityError("Can't get access token from the response")
         return json_response['access_token'], int(json_response['expires_in'])
 
-    def _need_request(self, force: bool) -> bool:
+    def _need_request(self, force: bool, client_id: str) -> bool:
         """Return True if a new token should be requested.
 
         A new request is needed when force=True, when there is no cached
         token, or when the cached token is expired.
         """
-        if force or self._restream_auth_token is None:
+        if force or (token := self._tokens.get(client_id)) is None:
             return True
-        current_timestamp = datetime.now().timestamp()
-        return current_timestamp >= self._expires_in + self._last_update
+        return token.is_expired()
+
+    def _save_token(self, response: requests.Response | httpx.Response, client_id: str) -> None:
+        """Parse and store the token for the given client_id in the in-memory cache.
+
+        Parameters:
+            response: HTTP response containing JSON with access_token and expires_in.
+            client_id: The client identifier used as the cache key.
+
+        Side effects:
+            Updates self._tokens[client_id] with a RestreamToken instance.
+        """
+        restream_auth_token, expires_in = self._parse_response(response)
+        last_update = int(datetime.now().timestamp())
+        new_token = RestreamToken(
+            token=restream_auth_token,
+            expires_in=expires_in,
+            last_update=last_update,
+        )
+        self._tokens[client_id] = new_token
+
+    @staticmethod
+    def _check_response_status_code(response: requests.Response | httpx.Response) -> None:
+        """Validate the HTTP status code for an auth request and raise typed errors.
+
+        Parameters:
+            response: requests/httpx response object returned from the auth endpoint.
+
+        Raises:
+            CredentialsError: On 401 or 403 Unauthorized responses.
+            APICompatibilityError: On 404 Not Found (likely wrong URL/host).
+            HTTPError: For any other non-2xx status via response.raise_for_status().
+        """
+        if response.status_code in [401, 403]:
+            raise CredentialsError("Unauthorized: invalid client_id and/or client_secret")
+        if response.status_code == 404:
+            raise APICompatibilityError(f"Wrong authorization url: {format(response.url)}")
+        response.raise_for_status()
 
     @exponential_backoff
     def get_access_token(self, client_id: str = None, client_secret: str = None, force: bool = False) -> str:
@@ -860,20 +918,26 @@ class Authorization(metaclass=Singleton):
         Returns:
             Bearer token string.
         """
-        if not self._need_request(force):
-            return self._restream_auth_token
+        client_id, client_secret = Authorization._select_client_id_and_secret(client_id, client_secret)
+
+        if not self._need_request(force, client_id):
+            return self._tokens[client_id].token
 
         payload = self._create_payload(client_id, client_secret)
-        with self._sync_lock:
+        url = self._build_auth_url()
+
+        # This works as an independent lock for each client_id
+        with ConcurrencyLimiter(url, client_id, 1):
             # If a token was acquired during the lock
-            if not self._need_request(force):
-                return self._restream_auth_token
-            url = self._build_auth_url()
+            if not self._need_request(force, client_id):
+                return self._tokens[client_id].token
+
             response = requests.post(url, data=payload, timeout=10)
-            response.raise_for_status()
-            self._restream_auth_token, self._expires_in = self._parse_response(response)
-            self._last_update = datetime.now().timestamp()
-        return self._restream_auth_token
+            Authorization._check_response_status_code(response)
+
+            # Save new token for this client_id
+            self._save_token(response, client_id)
+        return self._tokens[client_id].token
 
     @exponential_backoff
     async def aget_access_token(self, client_id: str = None, client_secret: str = None, force: bool = False) -> str:
@@ -887,18 +951,24 @@ class Authorization(metaclass=Singleton):
         Returns:
             Bearer token string.
         """
-        if not self._need_request(force):
-            return self._restream_auth_token
+        client_id, client_secret = Authorization._select_client_id_and_secret(client_id, client_secret)
 
+        if not self._need_request(force, client_id):
+            return self._tokens[client_id].token
+
+        url = self._build_auth_url()
         payload = self._create_payload(client_id, client_secret)
-        async with self._async_lock:
+
+        # This works as an independent lock for each client_id
+        async with AsyncConcurrencyLimiter(url, client_id, 1):
             # If a token was acquired during the lock
-            if not self._need_request(force):
-                return self._restream_auth_token
-            url = self._build_auth_url()
+            if not self._need_request(force, client_id):
+                return self._tokens[client_id].token
+
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(url, data=payload)
-            response.raise_for_status()
-            self._restream_auth_token, self._expires_in = self._parse_response(response)
-            self._last_update = datetime.now().timestamp()
-        return self._restream_auth_token
+            Authorization._check_response_status_code(response)
+
+            # Save new token for this client_id
+            self._save_token(response, client_id)
+        return self._tokens[client_id].token

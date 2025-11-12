@@ -1,3 +1,4 @@
+import datetime
 import types
 from decimal import Decimal
 import json
@@ -7,7 +8,7 @@ import pytest
 import requests
 import httpx
 
-from restreamsolutions.communicator import Communicator, Authorization
+from restreamsolutions.communicator import Communicator, Authorization, RestreamToken
 from restreamsolutions.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError, ServerError
 
 
@@ -710,8 +711,7 @@ def test_websocket_generator_async_error_raises(monkeypatch):
 def _reset_auth_singleton():
     # Ensure the singleton internal state is clean for each test
     auth = Authorization()
-    auth._restream_auth_token = None
-    auth._expires_in = 0
+    auth._tokens = {}
     return auth
 
 
@@ -728,7 +728,8 @@ def test_authorization_create_payload_from_params_and_env(monkeypatch):
     # When params are missing, take from env
     monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ENV_ID')
     monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'ENV_SEC')
-    payload2 = Authorization()._create_payload()
+    cliend_id, client_secret = Authorization()._select_client_id_and_secret()
+    payload2 = Authorization()._create_payload(cliend_id, client_secret)
     assert payload2['client_id'] == 'ENV_ID'
     assert payload2['client_secret'] == 'ENV_SEC'
     assert payload2['grant_type'] == 'client_credentials'
@@ -739,7 +740,8 @@ def test_authorization_create_payload_from_params_and_env(monkeypatch):
     from restreamsolutions.exceptions import CredentialsError
 
     with pytest.raises(CredentialsError):
-        Authorization()._create_payload()
+        cliend_id, client_secret = Authorization()._select_client_id_and_secret()
+        Authorization()._create_payload(cliend_id, client_secret)
 
 
 def test_authorization_parse_response_success_and_errors():
@@ -805,9 +807,12 @@ def test_get_access_token_posts_and_returns_token(monkeypatch):
 
 def test_get_access_token_uses_cache_when_not_expired(monkeypatch):
     auth = _reset_auth_singleton()
+    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
+    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
     # Preload cache and set far future expiry so _need_request returns False
-    auth._restream_auth_token = 'CACHED'
-    auth._expires_in = 10**9  # far future
+    auth._tokens['ID'] = RestreamToken(
+        token='CACHED', expires_in=10**9, last_update=datetime.datetime.now(tz=datetime.timezone.utc).timestamp()
+    )
 
     def fail_post(*args, **kwargs):
         raise AssertionError('requests.post should not be called when cache is valid')
@@ -867,8 +872,12 @@ async def test_aget_access_token_posts_and_returns_token_async(monkeypatch):
 @pytest.mark.asyncio
 async def test_aget_access_token_uses_cache_when_not_expired(monkeypatch):
     auth = _reset_auth_singleton()
-    auth._restream_auth_token = 'token'
-    auth._expires_in = 10**9
+    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
+    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
+    # Preload cache and set far future expiry so _need_request returns False
+    auth._tokens['ID'] = RestreamToken(
+        token='CACHED', expires_in=10**9, last_update=datetime.datetime.now(tz=datetime.timezone.utc).timestamp()
+    )
 
     class FailingAsyncClient:
         def __init__(self, *a, **k):
@@ -882,7 +891,7 @@ async def test_aget_access_token_uses_cache_when_not_expired(monkeypatch):
 
     monkeypatch.setattr(httpx, 'AsyncClient', FailingAsyncClient)
 
-    assert await auth.aget_access_token() == 'token'
+    assert await auth.aget_access_token() == 'CACHED'
 
 
 @pytest.mark.asyncio
