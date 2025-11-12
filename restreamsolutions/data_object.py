@@ -9,7 +9,7 @@ from pathlib import Path
 import aiofiles
 import pandas as pd
 
-from restreamsolutions.exceptions import APICompatibilityError, CredentialsError
+from restreamsolutions.exceptions import APICompatibilityError, CredentialsError, AuthError
 
 
 class BaseData:
@@ -161,15 +161,20 @@ class Data(BaseData):
                 except (CredentialsError, APICompatibilityError):
                     # Do not retry on these errors
                     raise
-                except Exception as e:
+                except (Exception, AuthError) as e:
                     if not self._restart_on_error:
                         raise
+
+                    if isinstance(e, AuthError) and self._auth_token is not None:
+                        # This means the token is provided explicitly, no reason to retry
+                        raise
+
                     # We should restart on error: check attempts policy
                     if finite_attempts:
                         attempts_left -= 1
                         if attempts_left <= 0:
                             raise
-                        sleep_delay = random.uniform(delay / 2, delay * 1.5) if self._jitter else delay
+                        sleep_delay = random.uniform(max(delay / 2, 1), delay * 1.5) if self._jitter else delay
                         warnings.warn(
                             f"Got exception: {e}, reconnecting, retry in {sleep_delay} seconds", RuntimeWarning
                         )
@@ -354,8 +359,12 @@ class DataAsync(BaseData):
                 except (CredentialsError, APICompatibilityError):
                     # Do not retry on these errors
                     raise
-                except Exception as e:
+                except (Exception, AuthError) as e:
                     if not self._restart_on_error:
+                        raise
+
+                    if isinstance(e, AuthError) and self._auth_token is not None:
+                        # This means the token is provided explicitly, no reason to retry
                         raise
 
                     # We should restart on error: check attempts policy
@@ -363,7 +372,7 @@ class DataAsync(BaseData):
                         attempts_left -= 1
                         if attempts_left <= 0:
                             raise
-                        sleep_delay = random.uniform(delay / 2, delay * 1.5) if self._jitter else delay
+                        sleep_delay = random.uniform(max(delay / 2, 1), delay * 1.5) if self._jitter else delay
                         warnings.warn(
                             f"Got exception: {e}, reconnecting, retry in {sleep_delay} seconds", RuntimeWarning
                         )
