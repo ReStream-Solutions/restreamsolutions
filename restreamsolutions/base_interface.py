@@ -144,7 +144,7 @@ class BaseInterface:
             An instance of the current class or a raw dict if as_dict is True.
         """
         url = cls._format_url(cls._api_url_single_object, id=id)
-        json_response = Communicator.send_get_request(url, auth_token, **filters)
+        json_response = Communicator.send_get_request(url, auth_token=auth_token, **filters)
         return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
@@ -161,7 +161,7 @@ class BaseInterface:
             A list of class instances or a raw list of dicts if as_dict is True.
         """
         url = cls._format_url(cls._api_url_multiple_objects)
-        json_response = Communicator.send_get_request(url, auth_token, **filters)
+        json_response = Communicator.send_get_request(url, auth_token=auth_token, **filters)
         return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
@@ -179,7 +179,7 @@ class BaseInterface:
             An instance of the current class or a raw dict if as_dict is True.
         """
         url = cls._format_url(cls._api_url_single_object, id=id)
-        json_response = await Communicator.send_get_request_async(url, auth_token, **filters)
+        json_response = await Communicator.send_get_request_async(url, auth_token=auth_token, **filters)
         return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
@@ -196,7 +196,7 @@ class BaseInterface:
             A list of class instances or a raw list of dicts if as_dict is True.
         """
         url = cls._format_url(cls._api_url_multiple_objects)
-        json_response = await Communicator.send_get_request_async(url, auth_token, **filters)
+        json_response = await Communicator.send_get_request_async(url, auth_token=auth_token, **filters)
         return cls._build_multiple_from_response(json_response, auth_token=auth_token, as_dict=as_dict)
 
     def update(self):

@@ -5,6 +5,12 @@ from enum import Enum
 # Base URL for the Restream Solutions external API
 RESTREAM_HOST = 'https://app.restreamsolutions.com'
 
+# The number of concurrent calls to the same endpoint (does not include query parameters)
+MAX_CONCURRENT_CALLS_TO_ENDPOINT = 3
+
+# The number of concurrent calls to the websocket URL (includes query parameters)
+MAX_CONCURRENT_CALLS_TO_WEBSOCKET = 1
+
 
 class ENDPOINTS(Enum):
     """REST API endpoint path templates.
