@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.2.0] - 2025-11-25
+
+### New Features
+
+- Enabled streaming support for asynchronous requests.
+- Extended the `Authorization` class to support token management and storage for multiple `client_id`/`client_secret`
+  pairs, so previously issued tokens can be reused across sessions instead of being regenerated for every tool call.
+- Added `ConcurrencyLimiter` and `AsyncConcurrencyLimiter` to track and enforce concurrency limits independently
+  per client.
+
+### Bug Fixes
+
+- Fixed a bug where the SDK retried requests on `AuthError` even when an explicit token was provided; retries on
+  authorization failure now only occur when token generation is handled by the SDK itself.
+
 ## [v0.1.1] - 2025-10-28
 
 ### New Features
