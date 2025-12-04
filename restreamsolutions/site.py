@@ -47,6 +47,7 @@ class Site(BasePadSite):
     _api_url_data_websocket: str = ENDPOINTS.data_site_websocket.value
     _api_url_instance_updates_websocket: str = ENDPOINTS.site_updates_websocket.value
     _api_url_changelog_updates_websocket: str = ENDPOINTS.site_changelog_updates_websocket.value
+    _api_url_pad_parameters: str = ENDPOINTS.site_parameters
 
     # These type hints are used by the BaseInterface class to perform automatic type conversion
     # when a new instance is created.

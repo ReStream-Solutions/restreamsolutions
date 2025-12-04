@@ -41,6 +41,7 @@ class Pad(BasePadSite):
     _api_url_data_websocket: str = ENDPOINTS.data_pad_websocket.value
     _api_url_instance_updates_websocket: str = ENDPOINTS.pad_updates_websocket.value
     _api_url_changelog_updates_websocket: str = ENDPOINTS.pad_changelog_updates_websocket.value
+    _api_url_pad_parameters: str = ENDPOINTS.pad_parameters
 
     # These type hints are used by the BaseInterface class to perform automatic type conversion
     # when a new instance is created.
