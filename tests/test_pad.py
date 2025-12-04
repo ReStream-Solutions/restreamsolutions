@@ -324,6 +324,41 @@ async def test_pad_aget_stages_metadata(monkeypatch):
     assert len(out) == len(stages_payload)
 
 
+def test_pad_get_stages_aggregations_descriptions(monkeypatch):
+    token = 'tok'
+    pad = Pad(id=697, auth_token=token)
+    payload = load_json('pad_parameters.json')
+    url = f"{RESTREAM_HOST}{ENDPOINTS.pad_parameters.value}".format(id=pad.id)
+
+    def fake_get(u, auth_token, **params):
+        assert u == url
+        assert auth_token == token
+        return payload
+
+    monkeypatch.setattr(Communicator, 'send_get_request', fake_get)
+
+    out = pad.get_stages_aggregations_descriptions()
+    assert out == payload
+
+
+@pytest.mark.asyncio
+async def test_pad_aget_stages_aggregations_descriptions(monkeypatch):
+    token = 'tok'
+    pad = Pad(id=697, auth_token=token)
+    payload = load_json('pad_parameters.json')
+    url = f"{RESTREAM_HOST}{ENDPOINTS.pad_parameters.value}".format(id=pad.id)
+
+    async def fake_get(u, auth_token, **params):
+        assert u == url
+        assert auth_token == token
+        return payload
+
+    monkeypatch.setattr(Communicator, 'send_get_request_async', fake_get)
+
+    out = await pad.aget_stages_aggregations_descriptions()
+    assert out == payload
+
+
 # ------------------------
 # Measurement sources (Pad override)
 # ------------------------
