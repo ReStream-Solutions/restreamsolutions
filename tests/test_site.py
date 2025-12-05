@@ -329,6 +329,41 @@ async def test_site_aget_stages_metadata(monkeypatch):
     assert len(out) == len(stages_payload)
 
 
+def test_site_get_stages_aggregations_descriptions(monkeypatch):
+    token = 'tok'
+    site = Site(id=SITE_ID, auth_token=token)
+    payload = load_json('pad_parameters.json')
+    url = f"{RESTREAM_HOST}{ENDPOINTS.site_parameters.value}".format(id=site.id)
+
+    def fake_get(u, auth_token, **params):
+        assert u == url
+        assert auth_token == token
+        return payload
+
+    monkeypatch.setattr(Communicator, 'send_get_request', fake_get)
+
+    out = site.get_stages_aggregations_descriptions()
+    assert out == payload
+
+
+@pytest.mark.asyncio
+async def test_site_aget_stages_aggregations_descriptions(monkeypatch):
+    token = 'tok'
+    site = Site(id=SITE_ID, auth_token=token)
+    payload = load_json('pad_parameters.json')
+    url = f"{RESTREAM_HOST}{ENDPOINTS.site_parameters.value}".format(id=site.id)
+
+    async def fake_get(u, auth_token, **params):
+        assert u == url
+        assert auth_token == token
+        return payload
+
+    monkeypatch.setattr(Communicator, 'send_get_request_async', fake_get)
+
+    out = await site.aget_stages_aggregations_descriptions()
+    assert out == payload
+
+
 # ------------------------
 # Measurement sources (Site override)
 # ------------------------

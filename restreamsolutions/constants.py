@@ -47,6 +47,8 @@ class ENDPOINTS(Enum):
     pad_updates_websocket = '/external/thirdparty/v2/ws/pads/{id}/'
     site_changelog_updates_websocket = '/external/thirdparty/v2/ws/sites/{id}/data_changes/'
     pad_changelog_updates_websocket = '/external/thirdparty/v2/ws/pads/{id}/data_changes/'
+    pad_parameters = '/external/thirdparty/v1/pads/{id}/parameters/'
+    site_parameters = '/external/thirdparty/v1/sites/{id}/parameters/'
 
 
 class StageNameFilters(Enum):

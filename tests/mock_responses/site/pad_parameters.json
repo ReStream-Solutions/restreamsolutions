@@ -1,0 +1,785 @@
+[
+  {
+    "id": 15,
+    "name": "avg_bottomhole_pressure",
+    "config": {
+      "field": "bottom_hole_pressure_customer",
+      "si_unit": "kPa",
+      "base_unit": "kPa",
+      "aggregation": "average",
+      "imperial_unit": "psi"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": null,
+    "imperial_unit": 28,
+    "si_unit": 36,
+    "pads": []
+  },
+  {
+    "id": 95,
+    "name": "avg_bottomhole_prop_conc",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "sand_rate",
+          "value": 0,
+          "si_unit": "mg/L",
+          "operator": "greater_than",
+          "base_unit": "mg/L",
+          "imperial_unit": "ppa"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": null,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 223,
+    "name": "avg_bottomhole_prop_conc_stepeight",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 7.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 8.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 184,
+    "name": "avg_bottomhole_prop_conc_stepfive",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 4.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 5.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 171,
+    "name": "avg_bottomhole_prop_conc_stepfour",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 3.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 4.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 383,
+    "name": "avg_bottomhole_prop_conc_stepnine",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 8.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 9.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 132,
+    "name": "avg_bottomhole_prop_conc_stepone",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 0.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 1.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 209,
+    "name": "avg_bottomhole_prop_conc_stepseven",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 6.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 7.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 197,
+    "name": "avg_bottomhole_prop_conc_stepsix",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 5.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 6.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 158,
+    "name": "avg_bottomhole_prop_conc_stepthree",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 2.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 3.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 145,
+    "name": "avg_bottomhole_prop_conc_steptwo",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 1.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 2.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 119,
+    "name": "avg_bottomhole_prop_conc_stepzero",
+    "config": {
+      "field": "bottom_hole_proppant_concentration_customer",
+      "si_unit": "mg/L",
+      "base_unit": "mg/L",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": -0.2,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 0.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppa"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 3,
+    "imperial_unit": 3,
+    "si_unit": 21,
+    "pads": []
+  },
+  {
+    "id": 408,
+    "name": "avg_chlorides",
+    "config": {
+      "field": "chloride_prod_calc",
+      "si_unit": "ppm",
+      "base_unit": "ppm",
+      "conditions": [
+        {
+          "field": "clean_sample_slipstream_flow",
+          "value": 0.5,
+          "si_unit": "L/min",
+          "operator": "greater_than_or_equal",
+          "base_unit": "L/min",
+          "imperial_unit": "gpm"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "ppm"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 65,
+    "imperial_unit": 65,
+    "si_unit": 65,
+    "pads": []
+  },
+  {
+    "id": 26,
+    "name": "avg_clean_conductivity",
+    "config": {
+      "field": "clean_analytics_spool_conductivity",
+      "si_unit": "mS/cm",
+      "base_unit": "mS/cm",
+      "conditions": [
+        {
+          "field": "clean_sample_slipstream_flow",
+          "value": 2,
+          "si_unit": "L/min",
+          "operator": "greater_than_or_equal",
+          "base_unit": "L/min",
+          "imperial_unit": "gpm"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "mS/cm"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": null,
+    "imperial_unit": 48,
+    "si_unit": 48,
+    "pads": []
+  },
+  {
+    "id": 81,
+    "name": "avg_clean_conductvity_twenty_five_c",
+    "config": {
+      "field": "clean_analytics_spool_conductivity_25C",
+      "si_unit": "mS/cm",
+      "base_unit": "mS/cm",
+      "conditions": [
+        {
+          "field": "clean_sample_slipstream_flow",
+          "value": 2,
+          "si_unit": "L/min",
+          "operator": "greater_than_or_equal",
+          "base_unit": "L/min",
+          "imperial_unit": "gpm"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "mS/cm"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": null,
+    "imperial_unit": 48,
+    "si_unit": 48,
+    "pads": []
+  },
+  {
+    "id": 27,
+    "name": "avg_clean_corrosion",
+    "config": {
+      "field": "clean__corrosion_raw",
+      "si_unit": "mpy",
+      "base_unit": "mpy",
+      "conditions": [
+        {
+          "field": "clean_sample_slipstream_flow",
+          "value": 2,
+          "si_unit": "L/min",
+          "operator": "greater_than_or_equal",
+          "base_unit": "L/min",
+          "imperial_unit": "gpm"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "mpy"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": null,
+    "imperial_unit": 43,
+    "si_unit": 43,
+    "pads": []
+  },
+  {
+    "id": 19,
+    "name": "avg_clean_density",
+    "config": {
+      "field": "clean_feed_inlet_density",
+      "si_unit": "kg/L",
+      "base_unit": "kg/L",
+      "conditions": [
+        {
+          "field": "clean_sample_slipstream_flow",
+          "value": 2,
+          "si_unit": "L/min",
+          "operator": "greater_than_or_equal",
+          "base_unit": "L/min",
+          "imperial_unit": "gpm"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "lb/gal"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": null,
+    "imperial_unit": 53,
+    "si_unit": 35,
+    "pads": []
+  },
+  {
+    "id": 73,
+    "name": "avg_clean_orp",
+    "config": {
+      "field": "clean_analytics_spool_orp",
+      "si_unit": "mV",
+      "base_unit": "mV",
+      "conditions": [
+        {
+          "field": "clean_sample_slipstream_flow",
+          "value": 2,
+          "si_unit": "L/min",
+          "operator": "greater_than_or_equal",
+          "base_unit": "L/min",
+          "imperial_unit": "gpm"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "mV"
+    },
+    "type": "C",
+    "label": "",
+    "color": null,
+    "description": "Totally new description!",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-12-03T10:55:51.617214Z",
+    "units": null,
+    "imperial_unit": 52,
+    "si_unit": 52,
+    "pads": [
+      1058,
+      1071,
+      1085,
+      1054,
+      1084,
+      1050,
+      1065,
+      1108,
+      1094,
+      1099,
+      1110,
+      1136,
+      1135,
+      1056,
+      1052,
+      1088,
+      1140,
+      1069,
+      1079,
+      1132,
+      1070,
+      1060,
+      1104,
+      1044,
+      1072,
+      1083
+    ]
+  },
+  {
+    "id": 70,
+    "name": "avg_clean_ph",
+    "config": {
+      "field": "clean_analytics_spool_ph",
+      "si_unit": "pH",
+      "base_unit": "pH",
+      "conditions": [
+        {
+          "field": "clean_sample_slipstream_flow",
+          "value": 2,
+          "si_unit": "L/min",
+          "operator": "greater_than_or_equal",
+          "base_unit": "L/min",
+          "imperial_unit": "gpm"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "pH"
+    },
+    "type": "C",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": null,
+    "imperial_unit": 15,
+    "si_unit": 15,
+    "pads": [
+      1058,
+      1071,
+      1085,
+      1054,
+      1084,
+      1050,
+      1065,
+      1108,
+      1094,
+      1099,
+      1110,
+      1136,
+      1135,
+      1056,
+      1052,
+      1088,
+      1140,
+      1069,
+      1079,
+      1132,
+      1070,
+      1060,
+      1104,
+      1044,
+      1072,
+      1083
+    ]
+  },
+  {
+    "id": 51,
+    "name": "avg_clean_rate",
+    "config": {
+      "field": "clean_flow",
+      "si_unit": "m^3/min",
+      "base_unit": "L/min",
+      "conditions": [
+        {
+          "field": "sand_rate",
+          "value": 0,
+          "si_unit": "mg/L",
+          "operator": "greater_than",
+          "base_unit": "mg/L",
+          "imperial_unit": "ppa"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "bpm"
+    },
+    "type": "D",
+    "label": "Avg Clean Rate",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 51,
+    "imperial_unit": 51,
+    "si_unit": 56,
+    "pads": []
+  },
+  {
+    "id": 228,
+    "name": "avg_clean_rate_stepeight",
+    "config": {
+      "field": "clean_flow",
+      "si_unit": "m^3/min",
+      "base_unit": "L/min",
+      "conditions": [
+        {
+          "field": "frac_stage_step",
+          "value": 7.8,
+          "si_unit": "#",
+          "operator": "greater_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        },
+        {
+          "field": "frac_stage_step",
+          "value": 8.2,
+          "si_unit": "#",
+          "operator": "less_than",
+          "base_unit": "#",
+          "imperial_unit": "#"
+        }
+      ],
+      "aggregation": "average",
+      "imperial_unit": "bpm"
+    },
+    "type": "D",
+    "label": "",
+    "color": null,
+    "description": "",
+    "created_at": "2025-11-27T14:26:24.572308Z",
+    "updated_at": "2025-11-27T14:26:24.627496Z",
+    "units": 71,
+    "imperial_unit": 71,
+    "si_unit": 56,
+    "pads": []
+  }
+]
