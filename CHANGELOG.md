@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.3.0] - 2025-12-09
+
+### New Features
+
+- Added `get_stages_aggregations_descriptions` and `aget_stages_aggregations_descriptions` methods for retrieving the
+  list of available aggregations that are automatically calculated for each frac stage. The aggregation values can be
+  obtained using the `get_stages_metadata` and `aget_stages_metadata` methods.
+
+### Bug Fixes
+
+- Fixed a bug in `get_stages_metadata` and `aget_stages_metadata` where an error occurred if the history list was empty.
+
 ## [v0.2.0] - 2025-11-25
 
 ### New Features
