@@ -207,9 +207,9 @@ class BasePadSite(BaseInterface):
         Returns:
             The same list enriched with an 'aggregations' key for each stage.
         """
-        if not stages_metadata:
+        stages_ids = [stage.get('id') for stage in stages_metadata or [] if stage.get('id') is not None]
+        if not stages_ids:
             return stages_metadata
-        stages_ids = [stage.get('id') for stage in stages_metadata if stage.get('id') is not None]
         url = self._format_url(self._api_url_aggregations_metadata, id=self.id)
         aggregations = Communicator.send_get_request(url, auth_token=auth_token, histories=stages_ids)
         stages_metadata = self._merge_aggregations_with_stages(stages_metadata, aggregations)
@@ -227,9 +227,9 @@ class BasePadSite(BaseInterface):
         Returns:
             The same list enriched with an 'aggregations' key for each stage.
         """
-        if not stages_metadata:
+        stages_ids = [stage.get('id') for stage in stages_metadata or [] if stage.get('id') is not None]
+        if not stages_ids:
             return stages_metadata
-        stages_ids = [stage.get('id') for stage in stages_metadata if stage.get('id') is not None]
         url = self._format_url(self._api_url_aggregations_metadata, id=self.id)
         aggregations = await Communicator.send_get_request_async(url, auth_token=auth_token, histories=stages_ids)
         stages_metadata = self._merge_aggregations_with_stages(stages_metadata, aggregations)
