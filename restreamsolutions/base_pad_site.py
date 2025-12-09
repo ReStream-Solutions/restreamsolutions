@@ -755,9 +755,9 @@ class BasePadSite(BaseInterface):
             A list of dictionaries describing pad parameters.
         """
         url = self._format_url(self._api_url_pad_parameters, id=self.id)
-        stages_metadata = Communicator.send_get_request(url, auth_token=self._auth_token)
+        stages_aggregations = Communicator.send_get_request(url, auth_token=self._auth_token)
 
-        return stages_metadata
+        return stages_aggregations
 
     async def aget_stages_aggregations_descriptions(self):
         """Asynchronously fetch pad parameters for this entity (pad/site).
@@ -766,6 +766,6 @@ class BasePadSite(BaseInterface):
             A list of dictionaries describing pad parameters.
         """
         url = self._format_url(self._api_url_pad_parameters, id=self.id)
-        stages_metadata = await Communicator.send_get_request_async(url, auth_token=self._auth_token)
+        stages_aggregations = await Communicator.send_get_request_async(url, auth_token=self._auth_token)
 
-        return stages_metadata
+        return stages_aggregations
