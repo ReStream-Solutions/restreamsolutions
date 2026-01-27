@@ -128,7 +128,7 @@ class BasePadSite(BaseInterface):
         stages_metadata = Communicator.send_get_request(url, auth_token=self._auth_token, **filters)
 
         if add_aggregations:
-            stages_metadata = self._add_aggregations(stages_metadata, self._auth_token)
+            stages_metadata = self._add_aggregations(stages_metadata, self._auth_token, **filters)
 
         return stages_metadata
 
@@ -161,7 +161,7 @@ class BasePadSite(BaseInterface):
         stages_metadata = await Communicator.send_get_request_async(url, auth_token=self._auth_token, **filters)
 
         if add_aggregations:
-            stages_metadata = await self._add_aggregations_async(stages_metadata, self._auth_token)
+            stages_metadata = await self._add_aggregations_async(stages_metadata, self._auth_token, **filters)
 
         return stages_metadata
 
@@ -197,12 +197,15 @@ class BasePadSite(BaseInterface):
                 stage_metadata['aggregations'] = None
         return stages_metadata
 
-    def _add_aggregations(self, stages_metadata: list[dict[str, Any]], auth_token: str = None) -> list[dict[str, Any]]:
+    def _add_aggregations(
+        self, stages_metadata: list[dict[str, Any]], auth_token: str = None, **filters
+    ) -> list[dict[str, Any]]:
         """Fetch and attach aggregations to the provided historic stages list.
 
         Parameters:
             stages_metadata: List of historic stage dicts obtained from get_stages_metadata.
             auth_token: Authorization token (Optional).
+            **filters: Additional endpoint filters, supported by the endpoint.
 
         Returns:
             The same list enriched with an 'aggregations' key for each stage.
@@ -211,18 +214,19 @@ class BasePadSite(BaseInterface):
         if not stages_ids:
             return stages_metadata
         url = self._format_url(self._api_url_aggregations_metadata, id=self.id)
-        aggregations = Communicator.send_get_request(url, auth_token=auth_token, histories=stages_ids)
+        aggregations = Communicator.send_get_request(url, auth_token=auth_token, histories=stages_ids, **filters)
         stages_metadata = self._merge_aggregations_with_stages(stages_metadata, aggregations)
         return stages_metadata
 
     async def _add_aggregations_async(
-        self, stages_metadata: list[dict[str, Any]], auth_token: str = None
+        self, stages_metadata: list[dict[str, Any]], auth_token: str = None, **filters
     ) -> list[dict[str, Any]]:
         """Asynchronously fetch and attach aggregations to the provided historic stages list.
 
         Parameters:
             stages_metadata: List of historic stage dicts obtained from get_stages_metadata.
             auth_token: Authorization token (Optional).
+            **filters: Additional endpoint filters, supported by the endpoint.
 
         Returns:
             The same list enriched with an 'aggregations' key for each stage.
@@ -231,7 +235,9 @@ class BasePadSite(BaseInterface):
         if not stages_ids:
             return stages_metadata
         url = self._format_url(self._api_url_aggregations_metadata, id=self.id)
-        aggregations = await Communicator.send_get_request_async(url, auth_token=auth_token, histories=stages_ids)
+        aggregations = await Communicator.send_get_request_async(
+            url, auth_token=auth_token, histories=stages_ids, **filters
+        )
         stages_metadata = self._merge_aggregations_with_stages(stages_metadata, aggregations)
         return stages_metadata
 
