@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.3.1] - 2026-01-27
+
+### Bug Fixes
+
+- Fixed a bug in `get_stages_metadata` and `aget_stages_metadata` where `**filters` were not passed to the aggregations 
+  request when `add_aggregations=True`.
+
 ## [v0.3.0] - 2025-12-09
 
 ### New Features
