@@ -60,6 +60,8 @@ class Pad(BasePadSite):
         complete: bool | None = None,
         well_api: str | None = None,
         site_pk: int | None = None,
+        fleet_id: int | None = None,
+        fleet_name: str | None = None,
         **filters,
     ) -> "list[Pad] | list[dict]":
         """Fetch Pad objects from the API.
@@ -72,6 +74,8 @@ class Pad(BasePadSite):
             well_api (str | None): Optional well API (well identifier) used to filter pads by the site with
             the provided well API.
             site_pk (int | None): Optional site primary key to filter pads by a specific site.
+            fleet_id (int | None): Optional fleet identifier to filter pads by fleet.
+            fleet_name (str | None): Optional fleet name to filter pads by fleet.
             **filters: Additional query parameters supported by the API.
 
         Returns:
@@ -85,7 +89,8 @@ class Pad(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         return super().get_models(
-            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk, **filters
+            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk,
+            fleet_id=fleet_id, fleet_name=fleet_name, **filters,
         )
 
     @classmethod
@@ -96,6 +101,8 @@ class Pad(BasePadSite):
         complete: bool | None = None,
         well_api: str | None = None,
         site_pk: int | None = None,
+        fleet_id: int | None = None,
+        fleet_name: str | None = None,
         **filters,
     ) -> "list[Pad] | list[dict]":
         """Asynchronously fetch Pad objects from the API.
@@ -108,6 +115,8 @@ class Pad(BasePadSite):
             well_api (str | None): Optional well API (well identifier) used to filter pads by the site with
             the provided well API.
             site_pk (int | None): Optional site primary key to filter pads by a specific site.
+            fleet_id (int | None): Optional fleet identifier to filter pads by fleet.
+            fleet_name (str | None): Optional fleet name to filter pads by fleet.
             **filters: Additional query parameters supported by the API.
 
         Returns:
@@ -121,7 +130,8 @@ class Pad(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         return await super().aget_models(
-            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk, **filters
+            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk,
+            fleet_id=fleet_id, fleet_name=fleet_name, **filters,
         )
 
     def get_sites(self, as_dict=False, **filters) -> list[Site] | list[dict[str, Any]]:

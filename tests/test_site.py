@@ -762,3 +762,39 @@ async def test_site_aget_realtime_data_changes_updates(monkeypatch):
     assert all(isinstance(it, DataChanges) for it in collected2)
     assert [it.id for it in collected2] == [m['id'] for m in messages]
     assert all(getattr(it, '_auth_token') == token for it in collected2)
+
+
+# ------------------------
+# Fleet fields
+# ------------------------
+
+
+def test_site_has_fleet_fields(monkeypatch):
+    token = 'tok'
+    payload = load_json('site_one.json')
+    url = f"{RESTREAM_HOST}{ENDPOINTS.sites_one.value}".format(id=SITE_ID)
+
+    def fake_get(u, auth_token, **params):
+        assert u == url
+        return payload
+
+    monkeypatch.setattr(Communicator, 'send_get_request', fake_get)
+
+    site = Site.get_model(auth_token=token, id=SITE_ID)
+    assert site.fleet_id == 5
+    assert site.fleet_name == "Alpha Fleet"
+
+
+def test_site_fleet_fields_null(monkeypatch):
+    token = 'tok'
+    payload = {**load_json('site_one.json'), "fleet_id": None, "fleet_name": None}
+    url = f"{RESTREAM_HOST}{ENDPOINTS.sites_one.value}".format(id=SITE_ID)
+
+    def fake_get(u, auth_token, **params):
+        return payload
+
+    monkeypatch.setattr(Communicator, 'send_get_request', fake_get)
+
+    site = Site.get_model(auth_token=token, id=SITE_ID)
+    assert site.fleet_id is None
+    assert site.fleet_name is None

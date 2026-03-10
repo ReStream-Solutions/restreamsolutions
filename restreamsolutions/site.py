@@ -34,6 +34,8 @@ class Site(BasePadSite):
       - timezone (str): Timezone name for this site.
       - current_stage_number (int): Current stage number.
       - current_state (str): Current state for this site ('frac_frac', 'standby_standby', 'wl_*').
+      - fleet_id (int): Fleet identifier if the site belongs to a fleet.
+      - fleet_name (str): Fleet name if the site belongs to a fleet.
     """
 
     _api_url_single_object: str = ENDPOINTS.sites_one.value
@@ -65,6 +67,8 @@ class Site(BasePadSite):
     timezone: str
     current_stage_number: int
     current_state: str
+    fleet_id: int
+    fleet_name: str
 
     @classmethod
     def get_models(
@@ -73,6 +77,8 @@ class Site(BasePadSite):
         as_dict=False,
         complete: bool | None = None,
         pad_pk: int | None = None,
+        fleet_id: int | None = None,
+        fleet_name: str | None = None,
         **filters,
     ) -> "list[Site] | list[dict]":
         """Fetch Site objects from the API.
@@ -83,6 +89,8 @@ class Site(BasePadSite):
             as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
             complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
             pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
+            fleet_id (int | None): Optional fleet identifier to filter sites by fleet.
+            fleet_name (str | None): Optional fleet name to filter sites by fleet.
             **filters: Additional query parameters supported by the API.
 
         Returns:
@@ -95,7 +103,10 @@ class Site(BasePadSite):
             APIConcurrencyLimitError: If the API rate limit is reached.
             HTTPError: For other non-2xx HTTP responses.
         """
-        return super().get_models(auth_token=auth_token, as_dict=as_dict, complete=complete, pad_pk=pad_pk, **filters)
+        return super().get_models(
+            auth_token=auth_token, as_dict=as_dict, complete=complete, pad_pk=pad_pk,
+            fleet_id=fleet_id, fleet_name=fleet_name, **filters,
+        )
 
     @classmethod
     async def aget_models(
@@ -104,6 +115,8 @@ class Site(BasePadSite):
         as_dict=False,
         complete: bool | None = None,
         pad_pk: int | None = None,
+        fleet_id: int | None = None,
+        fleet_name: str | None = None,
         **filters,
     ) -> "list[Site] | list[dict]":
         """Asynchronously fetch Site objects from the API.
@@ -114,6 +127,8 @@ class Site(BasePadSite):
             as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
             complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
             pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
+            fleet_id (int | None): Optional fleet identifier to filter sites by fleet.
+            fleet_name (str | None): Optional fleet name to filter sites by fleet.
             **filters: Additional query parameters supported by the API.
 
         Returns:
@@ -127,7 +142,8 @@ class Site(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         return await super().aget_models(
-            auth_token=auth_token, as_dict=as_dict, complete=complete, pad_pk=pad_pk, **filters
+            auth_token=auth_token, as_dict=as_dict, complete=complete, pad_pk=pad_pk,
+            fleet_id=fleet_id, fleet_name=fleet_name, **filters,
         )
 
     def get_state(self, as_dict: bool = False) -> Optional['State'] | Optional[dict[str, Any]]:
