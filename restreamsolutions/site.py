@@ -77,8 +77,6 @@ class Site(BasePadSite):
         as_dict=False,
         complete: bool | None = None,
         pad_pk: int | None = None,
-        fleet_id: int | None = None,
-        fleet_name: str | None = None,
         **filters,
     ) -> "list[Site] | list[dict]":
         """Fetch Site objects from the API.
@@ -89,9 +87,10 @@ class Site(BasePadSite):
             as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
             complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
             pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
-            fleet_id (int | None): Optional fleet identifier to filter sites by fleet.
-            fleet_name (str | None): Optional fleet name to filter sites by fleet.
             **filters: Additional query parameters supported by the API.
+                Supported filters include:
+                - fleet_id (int): Filter sites by fleet identifier.
+                - fleet_name (str): Filter sites by fleet name (case-insensitive contains).
 
         Returns:
             list[Site] | list[dict]: A list of Site objects (or dicts when as_dict=True).
@@ -105,7 +104,7 @@ class Site(BasePadSite):
         """
         return super().get_models(
             auth_token=auth_token, as_dict=as_dict, complete=complete, pad_pk=pad_pk,
-            fleet_id=fleet_id, fleet_name=fleet_name, **filters,
+            **filters,
         )
 
     @classmethod
@@ -115,8 +114,6 @@ class Site(BasePadSite):
         as_dict=False,
         complete: bool | None = None,
         pad_pk: int | None = None,
-        fleet_id: int | None = None,
-        fleet_name: str | None = None,
         **filters,
     ) -> "list[Site] | list[dict]":
         """Asynchronously fetch Site objects from the API.
@@ -127,9 +124,10 @@ class Site(BasePadSite):
             as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
             complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
             pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
-            fleet_id (int | None): Optional fleet identifier to filter sites by fleet.
-            fleet_name (str | None): Optional fleet name to filter sites by fleet.
             **filters: Additional query parameters supported by the API.
+                Supported filters include:
+                - fleet_id (int): Filter sites by fleet identifier.
+                - fleet_name (str): Filter sites by fleet name (case-insensitive contains).
 
         Returns:
             list[Site] | list[dict]: A list of Site objects (or dicts when as_dict=True).
@@ -143,7 +141,7 @@ class Site(BasePadSite):
         """
         return await super().aget_models(
             auth_token=auth_token, as_dict=as_dict, complete=complete, pad_pk=pad_pk,
-            fleet_id=fleet_id, fleet_name=fleet_name, **filters,
+            **filters,
         )
 
     def get_state(self, as_dict: bool = False) -> Optional['State'] | Optional[dict[str, Any]]:
