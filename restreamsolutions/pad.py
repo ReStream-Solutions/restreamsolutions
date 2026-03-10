@@ -73,7 +73,7 @@ class Pad(BasePadSite):
             the provided well API.
             site_pk (int | None): Optional site primary key to filter pads by a specific site.
             **filters: Additional query parameters supported by the API.
-                Supported filters include:
+                Some supported filters include:
                 - fleet_id (int): Filter pads by fleet identifier (pads with at least one site in that fleet).
                 - fleet_name (str): Filter pads by fleet name (case-insensitive contains).
 
@@ -113,7 +113,7 @@ class Pad(BasePadSite):
             the provided well API.
             site_pk (int | None): Optional site primary key to filter pads by a specific site.
             **filters: Additional query parameters supported by the API.
-                Supported filters include:
+                Some supported filters include:
                 - fleet_id (int): Filter pads by fleet identifier (pads with at least one site in that fleet).
                 - fleet_name (str): Filter pads by fleet name (case-insensitive contains).
 

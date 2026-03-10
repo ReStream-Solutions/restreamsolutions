@@ -88,7 +88,7 @@ class Site(BasePadSite):
             complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
             pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
             **filters: Additional query parameters supported by the API.
-                Supported filters include:
+                Some supported filters include:
                 - fleet_id (int): Filter sites by fleet identifier.
                 - fleet_name (str): Filter sites by fleet name (case-insensitive contains).
 
@@ -125,7 +125,7 @@ class Site(BasePadSite):
             complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
             pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
             **filters: Additional query parameters supported by the API.
-                Supported filters include:
+                Some supported filters include:
                 - fleet_id (int): Filter sites by fleet identifier.
                 - fleet_name (str): Filter sites by fleet name (case-insensitive contains).
 
