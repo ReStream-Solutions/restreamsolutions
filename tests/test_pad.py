@@ -359,6 +359,40 @@ async def test_pad_aget_stages_aggregations_descriptions(monkeypatch):
     assert out == payload
 
 
+@pytest.mark.asyncio
+async def test_pad_acreate_pad_parameters(monkeypatch):
+    token = 'tok'
+    pad = Pad(id=697, auth_token=token)
+    payload = load_json('pad_parameters.json')
+    url = f"{RESTREAM_HOST}{ENDPOINTS.pad_parameters.value}".format(id=pad.id)
+
+    input_params = [
+        {
+            "name": "avg_bottomhole_pressure",
+            "config": {
+                "field": "bottom_hole_pressure_customer",
+                "si_unit": "kPa",
+                "base_unit": "kPa",
+                "aggregation": "average",
+                "imperial_unit": "psi",
+            },
+            "description": "Detailed description",
+        }
+    ]
+
+    async def fake_post(u, body, auth_token, **params):
+        assert u == url
+        assert auth_token == token
+        assert body == input_params
+        return payload
+
+    monkeypatch.setattr(Communicator, 'send_post_request_async', fake_post)
+
+    out = await pad.acreate_pad_parameters(pad_parameters=input_params)
+    assert isinstance(out, list)
+    assert out == payload
+
+
 # ------------------------
 # Measurement sources (Pad override)
 # ------------------------
