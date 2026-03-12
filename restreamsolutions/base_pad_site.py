@@ -775,3 +775,33 @@ class BasePadSite(BaseInterface):
         stages_aggregations = await Communicator.send_get_request_async(url, auth_token=self._auth_token)
 
         return stages_aggregations
+    
+    async def acreate_pad_parameters(self, pad_parameters: list[dict]) -> list[dict]:
+        """
+        Create pad parameters for this entity (pad/site).
+
+        Parameters:
+            pad_parameters: A list of dictionaries describing pad parameters. Each dictionary should contain the following fields:
+                - name: The name of the parameter.
+                - config: A dictionary containing the configuration of the parameter.
+                - description: A detailed description of the parameter, what it does and how it is used.
+        
+        Example message:
+                [{
+                    "name": "avg_bottomhole_pressure",
+                    "config": {
+                        "field": "bottom_hole_pressure_customer",
+                        "si_unit": "kPa",
+                        "base_unit": "kPa",
+                        "aggregation": "average",
+                        "imperial_unit": "psi"
+                    },
+                    "description": "Detailed description",
+                }]
+
+        Returns:
+            A list of dictionaries describing created pad parameters.
+        """
+        url = self._format_url(self._api_url_pad_parameters, id=self.id)
+    
+        return await Communicator.send_post_request_async(url, pad_parameters, auth_token=self._auth_token)

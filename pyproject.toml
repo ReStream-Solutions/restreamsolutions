@@ -6,7 +6,6 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10,<4.0"
 authors = [
-  { name = "Riley Seaman", email = "rseaman@restreamsolutions.com" },
   { name = "Steven Brotherton", email = "sbrotherton@restreamsolutions.com" },
   { name = "Artem Prokopenko", email = "aprokopenko@restreamsolutions.com" }
 ]
