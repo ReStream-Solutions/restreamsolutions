@@ -15,7 +15,9 @@
     "pad_id": 693,
     "is_demo_site": true,
     "stage_total": 50,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": 5,
+    "fleet_name": "Alpha Fleet"
   },
   {
     "id": 1050,
@@ -33,7 +35,9 @@
     "pad_id": 693,
     "is_demo_site": true,
     "stage_total": 50,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": 5,
+    "fleet_name": "Alpha Fleet"
   },
   {
     "id": 1054,
@@ -51,7 +55,9 @@
     "pad_id": 693,
     "is_demo_site": true,
     "stage_total": 40,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": 5,
+    "fleet_name": "Alpha Fleet"
   },
   {
     "id": 1053,
@@ -69,7 +75,9 @@
     "pad_id": 693,
     "is_demo_site": true,
     "stage_total": 50,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": 5,
+    "fleet_name": "Alpha Fleet"
   },
   {
     "id": 1051,
@@ -87,7 +95,9 @@
     "pad_id": 693,
     "is_demo_site": true,
     "stage_total": 50,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": 5,
+    "fleet_name": "Alpha Fleet"
   },
   {
     "id": 1055,
@@ -105,7 +115,9 @@
     "pad_id": 694,
     "is_demo_site": true,
     "stage_total": 76,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": null,
+    "fleet_name": null
   },
   {
     "id": 1056,
@@ -123,7 +135,9 @@
     "pad_id": 694,
     "is_demo_site": true,
     "stage_total": 76,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": null,
+    "fleet_name": null
   },
   {
     "id": 1059,
@@ -141,7 +155,9 @@
     "pad_id": 694,
     "is_demo_site": true,
     "stage_total": 76,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": null,
+    "fleet_name": null
   },
   {
     "id": 1057,
@@ -159,7 +175,9 @@
     "pad_id": 694,
     "is_demo_site": true,
     "stage_total": 76,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": null,
+    "fleet_name": null
   },
   {
     "id": 1058,
@@ -177,7 +195,9 @@
     "pad_id": 694,
     "is_demo_site": true,
     "stage_total": 75,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": null,
+    "fleet_name": null
   },
   {
     "id": 1060,
@@ -195,7 +215,9 @@
     "pad_id": 694,
     "is_demo_site": true,
     "stage_total": 76,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": null,
+    "fleet_name": null
   },
   {
     "id": 1111,
@@ -213,7 +235,9 @@
     "pad_id": 697,
     "is_demo_site": true,
     "stage_total": 78,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": 10,
+    "fleet_name": "Beta Fleet"
   },
   {
     "id": 1113,
@@ -231,7 +255,9 @@
     "pad_id": 697,
     "is_demo_site": true,
     "stage_total": 46,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": 10,
+    "fleet_name": "Beta Fleet"
   },
   {
     "id": 1112,
@@ -249,6 +275,8 @@
     "pad_id": 697,
     "is_demo_site": true,
     "stage_total": 79,
-    "timezone": "US/Central"
+    "timezone": "US/Central",
+    "fleet_id": 10,
+    "fleet_name": "Beta Fleet"
   }
 ]

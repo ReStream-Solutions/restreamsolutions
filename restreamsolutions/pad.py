@@ -73,6 +73,9 @@ class Pad(BasePadSite):
             the provided well API.
             site_pk (int | None): Optional site primary key to filter pads by a specific site.
             **filters: Additional query parameters supported by the API.
+                Some supported filters include:
+                - fleet_id (int): Filter pads by fleet identifier (pads with at least one site in that fleet).
+                - fleet_name (str): Filter pads by fleet name (case-insensitive contains).
 
         Returns:
             list[Pad] | list[dict]: A list of Pad objects (or dicts when as_dict=True).
@@ -85,7 +88,8 @@ class Pad(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         return super().get_models(
-            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk, **filters
+            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk,
+            **filters,
         )
 
     @classmethod
@@ -109,6 +113,9 @@ class Pad(BasePadSite):
             the provided well API.
             site_pk (int | None): Optional site primary key to filter pads by a specific site.
             **filters: Additional query parameters supported by the API.
+                Some supported filters include:
+                - fleet_id (int): Filter pads by fleet identifier (pads with at least one site in that fleet).
+                - fleet_name (str): Filter pads by fleet name (case-insensitive contains).
 
         Returns:
             list[Pad] | list[dict]: A list of Pad objects (or dicts when as_dict=True).
@@ -121,7 +128,8 @@ class Pad(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         return await super().aget_models(
-            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk, **filters
+            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk,
+            **filters,
         )
 
     def get_sites(self, as_dict=False, **filters) -> list[Site] | list[dict[str, Any]]:

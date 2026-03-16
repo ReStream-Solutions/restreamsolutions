@@ -14,5 +14,7 @@
   "pad_id": 697,
   "is_demo_site": true,
   "stage_total": 79,
-  "timezone": "US/Central"
+  "timezone": "US/Central",
+  "fleet_id": 5,
+  "fleet_name": "Alpha Fleet"
 }
