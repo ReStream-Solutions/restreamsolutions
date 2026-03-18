@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.4.0] - 2026-03-18
+
+### New Features
+
+- Added `acreate_pad_parameters` method for creating pad parameters for a pad or site. Accepts a list of parameter
+  definitions, each specifying a `name`, a `config` (including field, units, and aggregation type), and a `description`.
+
 ## [v0.3.1] - 2026-01-27
 
 ### Bug Fixes
