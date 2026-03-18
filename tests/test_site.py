@@ -364,6 +364,40 @@ async def test_site_aget_stages_aggregations_descriptions(monkeypatch):
     assert out == payload
 
 
+@pytest.mark.asyncio
+async def test_site_acreate_pad_parameters(monkeypatch):
+    token = 'tok'
+    site = Site(id=SITE_ID, auth_token=token)
+    payload = load_json('pad_parameters.json')
+    url = f"{RESTREAM_HOST}{ENDPOINTS.site_parameters.value}".format(id=site.id)
+
+    input_params = [
+        {
+            "name": "avg_bottomhole_pressure",
+            "config": {
+                "field": "bottom_hole_pressure_customer",
+                "si_unit": "kPa",
+                "base_unit": "kPa",
+                "aggregation": "average",
+                "imperial_unit": "psi",
+            },
+            "description": "Detailed description",
+        }
+    ]
+
+    async def fake_post(u, body, auth_token, **params):
+        assert u == url
+        assert auth_token == token
+        assert body == input_params
+        return payload
+
+    monkeypatch.setattr(Communicator, 'send_post_request_async', fake_post)
+
+    out = await site.acreate_pad_parameters(pad_parameters=input_params)
+    assert isinstance(out, list)
+    assert out == payload
+
+
 # ------------------------
 # Measurement sources (Site override)
 # ------------------------
