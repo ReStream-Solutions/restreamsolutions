@@ -88,7 +88,11 @@ class Pad(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         return super().get_models(
-            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk,
+            auth_token=auth_token,
+            as_dict=as_dict,
+            complete=complete,
+            well_api=well_api,
+            site_pk=site_pk,
             **filters,
         )
 
@@ -128,7 +132,11 @@ class Pad(BasePadSite):
             HTTPError: For other non-2xx HTTP responses.
         """
         return await super().aget_models(
-            auth_token=auth_token, as_dict=as_dict, complete=complete, well_api=well_api, site_pk=site_pk,
+            auth_token=auth_token,
+            as_dict=as_dict,
+            complete=complete,
+            well_api=well_api,
+            site_pk=site_pk,
             **filters,
         )
 
