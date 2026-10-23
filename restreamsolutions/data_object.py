@@ -1,19 +1,136 @@
 import asyncio
 import json
-import time
-import warnings
-from typing import Generator, AsyncGenerator, Callable, Any
-import random
+import logging
 from pathlib import Path
+from typing import Any, AsyncGenerator, Callable, Generator, Optional
 
 import aiofiles
 import pandas as pd
 
-from restreamsolutions.exceptions import APICompatibilityError, CredentialsError, AuthError
+from restreamsolutions.exceptions import APICompatibilityError
+from restreamsolutions.retry import RetryPolicy
+
+logger = logging.getLogger(__name__)
 
 
 class BaseData:
     """Common utilities for data streaming classes."""
+
+    def __init__(
+        self,
+        data_generator_factory: Callable[[], Any],
+        restart_on_error: bool = False,
+        restart_on_close: bool = False,
+        convert_to: Any = None,
+        auth_token: str = None,
+        *,
+        attempts: Optional[int] = None,
+        retry_policy: Optional[RetryPolicy] = None,
+        restart_after_partial: bool = True,
+    ) -> None:
+        """Store the streaming configuration shared by the sync and async wrappers.
+
+        Args:
+            data_generator_factory: A callable that returns a new (async) generator yielding dict items.
+                A new generator must be created on each call so that the wrapper can reconnect.
+            restart_on_error: If True, the underlying generator is recreated when a retryable error
+                occurs and streaming continues. If False, the error is propagated.
+            restart_on_close: If True, the underlying generator is also recreated when it completes
+                normally (e.g. a WebSocket closes cleanly). If False, normal completion ends the stream.
+                The reconnection delay grows while the server keeps closing the stream without sending items.
+            convert_to: Optional class used to convert each yielded dict into a model instance.
+            auth_token: Token passed to converted instances. If set to a non-empty value, authorization errors are
+                never retried because the SDK cannot regenerate a user-provided token.
+            attempts: Maximum number of consecutive runs of the underlying generator before an error
+                is propagated. None means unlimited reconnection attempts.
+            retry_policy: Policy that classifies errors and computes reconnection delays.
+                Defaults to a policy without token refresh.
+            restart_after_partial: If False, an error that happens after at least one item was yielded
+                by the current run is propagated instead of restarting. Use it for finite HTTP streams
+                where a restart would re-send items that were already delivered.
+        """
+        if attempts is not None and attempts < 1:
+            raise ValueError("attempts must be >= 1 or None")
+        self._data_generator_factory = data_generator_factory
+        self._restart_on_error = restart_on_error
+        self._restart_on_close = restart_on_close
+        self._convert_to = convert_to
+        self._auth_token = auth_token
+        self._attempts = attempts
+        self._retry_policy = retry_policy or RetryPolicy()
+        self._restart_after_partial = restart_after_partial
+
+    def _convert_item(self, item: dict, convert_if_needed: bool) -> Any:
+        """Convert a raw item into the configured model class when requested.
+
+        Args:
+            item: Raw dict item yielded by the underlying generator.
+            convert_if_needed: If False, the item is returned as-is even when convert_to is configured.
+
+        Returns:
+            The converted model instance or the original item.
+
+        Raises:
+            APICompatibilityError: If the item cannot be converted.
+        """
+        if not (self._convert_to and convert_if_needed):
+            return item
+        try:
+            return self._convert_to(**item, auth_token=self._auth_token)
+        except Exception as exc:
+            raise APICompatibilityError(f'Failed to convert {item} to {self._convert_to}') from exc
+
+    def _prepare_restart(
+        self, exc: Exception, yielded_in_run: bool, failures: int, token_refreshed: bool, can_refresh: bool
+    ) -> tuple[float, bool]:
+        """Decide whether the stream may be restarted after an error and compute the delay.
+
+        Args:
+            exc: The exception raised by the underlying generator.
+            yielded_in_run: True if the failed run delivered at least one item.
+            failures: Number of consecutive failed runs including the current one, counted as if the current run
+                is a regular failure. A run that failed with a refreshable 401 does not consume an attempt.
+            token_refreshed: True if the access token was already refreshed during the current failure streak.
+            can_refresh: True if the retry policy has a token refresh callback for the caller's execution mode.
+
+        Returns:
+            A tuple (delay_seconds, refresh_needed). When refresh_needed is True the caller must refresh
+            the access token before the next run and the delay is zero.
+
+        Raises:
+            The original exception if the stream must not be restarted.
+        """
+        policy = self._retry_policy
+        if not self._restart_on_error or (yielded_in_run and not self._restart_after_partial):
+            raise exc
+        if policy.can_refresh_token(exc, bool(self._auth_token)):
+            # Refresh the SDK-managed token once per failure streak; a second 401 means the credentials are wrong.
+            # The refresh corrects the request instead of repeating it, so it is allowed even when attempts is 1
+            if token_refreshed or not can_refresh:
+                raise exc
+            logger.warning('Authorization failed, requesting a new access token and reconnecting')
+            return 0.0, True
+        if self._attempts is not None and failures >= self._attempts:
+            raise exc
+        if not policy.is_retryable(exc):
+            raise exc
+        delay = policy.delay_for(failures - 1, getattr(exc, 'retry_after', None))
+        logger.warning('Got exception %r, reconnecting in %.2f seconds', exc, delay)
+        return delay, False
+
+    def _close_delay(self, empty_closes: int) -> float:
+        """Return the delay before reconnecting after the server closed the stream.
+
+        Args:
+            empty_closes: Number of consecutive runs that were closed without yielding any item.
+
+        Returns:
+            Delay in seconds. It grows with empty_closes, so a server that keeps closing the stream
+            without sending data is not reconnected to in a tight loop.
+        """
+        delay = self._retry_policy.delay_for(max(empty_closes - 1, 0))
+        logger.warning('The connection was closed, reconnecting in %.2f seconds', delay)
+        return delay
 
     @classmethod
     def _check_and_prepare_path(cls, path: str, overwrite: bool) -> Path:
@@ -43,16 +160,30 @@ class BaseData:
 
     @staticmethod
     def _get_temp_json_path(json_path: Path) -> Path:
+        """Build the path of the hidden temporary JSON file used while producing a CSV file.
+
+        Args:
+            json_path: Target file path.
+
+        Returns:
+            A path in the same directory with a leading dot and a .json extension.
+        """
         return json_path.parent / f".{json_path.stem}.json"
 
     @staticmethod
     def convert_json_csv(json_path: Path, csv_path: Path):
+        """Convert a JSON array file into a CSV file using pandas.
+
+        Args:
+            json_path: Source JSON file containing an array of objects.
+            csv_path: Destination CSV file path.
+        """
         df = pd.read_json(json_path, convert_dates=False)
         df.to_csv(csv_path, index=False)
 
 
 class Data(BaseData):
-    """Synchronous wrapper around a data generator that streams data from an HTTP source.
+    """Synchronous wrapper around a data generator that streams data from an HTTP or WebSocket source.
 
     It lets you process the incoming stream item by item without loading a potentially
     large response fully into memory and without opening a connection to the server
@@ -66,127 +197,72 @@ class Data(BaseData):
 
     data_fetcher: Generator[dict, None, None]
 
-    def __init__(
-        self,
-        data_generator_factory: Callable[[], Generator[dict, None, None]],
-        restart_on_error: bool = False,
-        restart_on_close: bool = False,
-        convert_to: Any = None,
-        auth_token: str = None,
-        *,
-        attempts: int | None = None,
-        initial_delay: float = 1,
-        factor: float = 4.0,
-        jitter: bool = True,
-    ) -> None:
-        """Initialize the Data wrapper.
-
-        Args:
-            data_generator_factory: A callable that returns a new generator which
-                yields dict items to be saved or processed. A new generator should be created
-                on each call so that the instance of the Data class could be reusable.
-            restart_on_error: If True, the data_fetcher will automatically recreate the
-                underlying generator via the factory when an error occurs during iteration,
-                and continue yielding subsequent items. If False, the error is propagated.
-            restart_on_close: If True, the wrapper will also recreate the underlying generator
-                when it completes normally (e.g., a WebSocket closes cleanly) and continue
-                streaming. If False, normal completion will finish the stream.
-            attempts: If None (default), restarts happen indefinitely with a fixed wait of ``initial_delay`` seconds.
-                If a number is provided, use exponential backoff with the given number of attempts (like the decorator):
-                wait ``initial_delay`` before the first retry, then multiply by ``factor`` after each retry and stop
-                after attempts are exhausted.
-            initial_delay: Base delay in seconds before the first retry.
-            factor: Multiplier for exponential backoff when attempts is a number.
-            jitter: If True, applies uniform randomization to each wait in the range [delay/2, delay*1.5]
-                when attempts is a number; ignored when attempts is None (fixed delay).
-        """
-        self._data_generator_factory = data_generator_factory
-        self._restart_on_error = restart_on_error
-        self._restart_on_close = restart_on_close
-        self._convert_to = convert_to
-        self._auth_token = auth_token
-        if attempts is not None and attempts < 1:
-            raise ValueError("attempts must be >= 1 or None")
-        self._attempts = attempts
-        self._initial_delay = initial_delay
-        self._factor = factor
-        self._jitter = jitter
-
     @property
     def data_fetcher(self) -> Generator[dict, None, None]:
         """Return a fresh data generator that fetches data from the selected sites or pads.
 
         The returned generator is a wrapper over the underlying generator from the
         factory. If restart_on_error=True, it will recreate the underlying generator
-        when an exception occurs and continue yielding items. If restart_on_close=True,
+        when a retryable exception occurs and continue yielding items. If restart_on_close=True,
         it will also recreate the generator when it completes normally (e.g., clean WebSocket close)
         and continue streaming.
 
         Returns:
-            Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
+            Generator that yields dictionaries (or converted model instances) representing records
+            for sites or pads for a specific timestamp.
         """
         return self._data_fetcher(convert_if_needed=True)
 
     def _data_fetcher(self, convert_if_needed: bool = False) -> Generator[dict, None, None]:
-        """Return a fresh data generator that fetches data from the selected sites or pads.
+        """Return a fresh data generator with the reconnection logic applied.
 
-        The returned generator is a wrapper over the underlying generator from the
-        factory. If restart_on_error=True, it will recreate the underlying generator
-        when an exception occurs and continue yielding items. If restart_on_close=True,
-        it will also recreate the generator when it completes normally (e.g., clean WebSocket close)
-        and continue streaming.
+        Args:
+            convert_if_needed: If True, items are converted with convert_to when it is configured.
 
         Returns:
             Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
         """
 
         def _wrapper():
-            finite_attempts = self._attempts is not None
-            attempts_left = self._attempts if finite_attempts else None
-            delay = self._initial_delay
+            """Iterate over the underlying generator, recreating it according to the restart settings.
 
+            Yields:
+                Items of the underlying generator, converted with convert_to when requested.
+            """
+            policy = self._retry_policy
+            failures = 0
+            empty_closes = 0
+            token_refreshed = False
             while True:
                 gen = self._data_generator_factory()
+                yielded_in_run = False
                 try:
                     for item in gen:
-                        if self._convert_to and convert_if_needed:
-                            try:
-                                yield self._convert_to(**item, auth_token=self._auth_token)
-                            except Exception:
-                                raise APICompatibilityError(f'Failed to convert {item} to {self._convert_to}')
-                        else:
-                            yield item
+                        yielded_in_run = True
+                        failures = 0
+                        empty_closes = 0
+                        token_refreshed = False
+                        yield self._convert_item(item, convert_if_needed)
                     if not self._restart_on_close:
-                        break  # normal completion
-                except (CredentialsError, APICompatibilityError):
-                    # Do not retry on these errors
-                    raise
-                except (Exception, AuthError) as e:
-                    if not self._restart_on_error:
-                        raise
-
-                    if isinstance(e, AuthError) and self._auth_token is not None:
-                        # This means the token is provided explicitly, no reason to retry
-                        raise
-
-                    # We should restart on error: check attempts policy
-                    if finite_attempts:
-                        attempts_left -= 1
-                        if attempts_left <= 0:
-                            raise
-                        sleep_delay = random.uniform(max(delay / 2, 1), delay * 1.5) if self._jitter else delay
-                        warnings.warn(
-                            f"Got exception: {e}, reconnecting, retry in {sleep_delay} seconds", RuntimeWarning
-                        )
-                        time.sleep(sleep_delay)
-                        delay *= self._factor
+                        return
+                    if not yielded_in_run:
+                        empty_closes += 1
+                    delay = self._close_delay(empty_closes)
+                except Exception as exc:
+                    delay, refresh_needed = self._prepare_restart(
+                        exc, yielded_in_run, failures + 1, token_refreshed, policy.refresh_token is not None
+                    )
+                    if refresh_needed:
+                        policy.refresh_token(getattr(exc, 'rejected_token', None))
+                        token_refreshed = True
                     else:
-                        warnings.warn(
-                            f"Got exception: {e}, reconnecting, retry in {self._initial_delay} seconds", RuntimeWarning
-                        )
-                        time.sleep(self._initial_delay)
-                    continue
-                warnings.warn(f"The connection was closed. Reconnecting", RuntimeWarning)
+                        # A run that ended with a refreshable 401 does not consume an attempt
+                        failures += 1
+                finally:
+                    if hasattr(gen, 'close'):
+                        gen.close()
+                if delay > 0:
+                    policy.sleep(delay)
 
         return _wrapper()
 
@@ -212,7 +288,7 @@ class Data(BaseData):
             raise e
 
     def _save_csv(self, path: Path) -> None:
-        """Write the streamed items to a JSON file and then convert it to a CSV file.
+        """Write the streamed items to a temporary JSON file and then convert it to a CSV file.
 
         Args:
             path: Target file path (should have a .csv extension).
@@ -251,7 +327,7 @@ class Data(BaseData):
 
 
 class DataAsync(BaseData):
-    """Asynchronous wrapper around an async data generator that streams data from an HTTP source.
+    """Asynchronous wrapper around an async data generator that streams data from an HTTP or WebSocket source.
 
     All operations are asynchronous: the connection to the server is not opened
     until consumption of the async stream begins, and items are handled one by one
@@ -266,133 +342,76 @@ class DataAsync(BaseData):
 
     data_fetcher: AsyncGenerator[dict, None]
 
-    def __init__(
-        self,
-        data_generator_factory: Callable[[], AsyncGenerator[dict, None]],
-        restart_on_error: bool = False,
-        restart_on_close: bool = False,
-        convert_to: Any = None,
-        auth_token: str = None,
-        *,
-        attempts: int | None = None,
-        initial_delay: float = 1,
-        factor: float = 4.0,
-        jitter: bool = True,
-    ) -> None:
-        """Initialize the asynchronous Data wrapper.
-
-        Args:
-            data_generator_factory: A callable that returns a new async generator which
-                yields dict items to be saved or processed. A new generator should be created
-                on each call so that the instance of the DataAsync class could be reusable.
-            restart_on_error: If True, the data_fetcher will automatically recreate the
-                underlying async generator via the factory when an error occurs during
-                iteration, and continue yielding subsequent items. If False, the error is propagated.
-            restart_on_close: If True, the wrapper will also recreate the underlying async generator
-                when it completes normally (e.g., a WebSocket closes cleanly) and continue
-                streaming. If False, normal completion will finish the stream.
-            attempts: If None (default), restarts happen indefinitely with a fixed wait of ``initial_delay`` seconds.
-                If a number is provided, use exponential backoff with the given number of attempts (like the decorator):
-                wait ``initial_delay`` before the first retry, then multiply by ``factor`` after each retry and stop
-                after attempts are exhausted.
-            initial_delay: Base delay in seconds before the first retry.
-            factor: Multiplier for exponential backoff when attempts is a number.
-            jitter: If True, applies uniform randomization to each wait in the range [delay/2, delay*1.5]
-                when attempts is a number; ignored when attempts is None (fixed delay).
-        """
-        self._data_generator_factory = data_generator_factory
-        self._restart_on_error = restart_on_error
-        self._restart_on_close = restart_on_close
-        self._convert_to = convert_to
-        self._auth_token = auth_token
-        if attempts is not None and attempts < 1:
-            raise ValueError("attempts must be >= 1 or None")
-        self._attempts = attempts
-        self._initial_delay = initial_delay
-        self._factor = factor
-        self._jitter = jitter
-
     @property
     def data_fetcher(self) -> AsyncGenerator[dict, None]:
-        """Return a fresh  async data generator that fetches data from the selected sites or pads.
+        """Return a fresh async data generator that fetches data from the selected sites or pads.
 
         The returned async generator is a wrapper over the underlying generator from the
         factory. If restart_on_error=True, it will recreate the underlying generator when
-        an exception occurs and continue yielding items. If restart_on_close=True, it will also
+        a retryable exception occurs and continue yielding items. If restart_on_close=True, it will also
         recreate the generator when it completes normally (e.g., clean WebSocket close) and continue streaming.
 
         Returns:
-            Async Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
+            Async generator that yields dictionaries (or converted model instances) representing records
+            for sites or pads for a specific timestamp.
         """
         return self._data_fetcher(convert_if_needed=True)
 
     def _data_fetcher(self, convert_if_needed: bool = False) -> AsyncGenerator[dict, None]:
-        """Return a fresh  async data generator that fetches data from the selected sites or pads.
+        """Return a fresh async data generator with the reconnection logic applied.
 
-        The returned async generator is a wrapper over the underlying generator from the
-        factory. If restart_on_error=True, it will recreate the underlying generator when
-        an exception occurs and continue yielding items. If restart_on_close=True, it will also
-        recreate the generator when it completes normally (e.g., clean WebSocket close) and continue streaming.
+        Args:
+            convert_if_needed: If True, items are converted with convert_to when it is configured.
 
         Returns:
-            Async Generator that yields dictionaries representing records for sites or pads for a specific timestamp.
+            Async generator that yields dictionaries representing records for sites or pads for a specific timestamp.
         """
 
         async def _wrapper():
-            finite_attempts = self._attempts is not None
-            attempts_left = self._attempts if finite_attempts else None
-            delay = self._initial_delay
+            """Iterate over the underlying async generator, recreating it according to the restart settings.
 
+            Yields:
+                Items of the underlying async generator, converted with convert_to when requested.
+            """
+            policy = self._retry_policy
+            failures = 0
+            empty_closes = 0
+            token_refreshed = False
             while True:
                 agen = self._data_generator_factory()
+                yielded_in_run = False
                 try:
                     async for item in agen:
-                        if self._convert_to and convert_if_needed:
-                            try:
-                                yield self._convert_to(**item, auth_token=self._auth_token)
-                            except Exception:
-                                raise APICompatibilityError(f'Failed to convert {item} to {self._convert_to}')
-                        else:
-                            yield item
+                        yielded_in_run = True
+                        failures = 0
+                        empty_closes = 0
+                        token_refreshed = False
+                        yield self._convert_item(item, convert_if_needed)
                     if not self._restart_on_close:
-                        break  # normal completion
-                except (CredentialsError, APICompatibilityError):
-                    # Do not retry on these errors
-                    raise
-                except (Exception, AuthError) as e:
-                    if not self._restart_on_error:
-                        raise
-
-                    if isinstance(e, AuthError) and self._auth_token is not None:
-                        # This means the token is provided explicitly, no reason to retry
-                        raise
-
-                    # We should restart on error: check attempts policy
-                    if finite_attempts:
-                        attempts_left -= 1
-                        if attempts_left <= 0:
-                            raise
-                        sleep_delay = random.uniform(max(delay / 2, 1), delay * 1.5) if self._jitter else delay
-                        warnings.warn(
-                            f"Got exception: {e}, reconnecting, retry in {sleep_delay} seconds", RuntimeWarning
-                        )
-                        await asyncio.sleep(sleep_delay)
-                        delay *= self._factor
+                        return
+                    if not yielded_in_run:
+                        empty_closes += 1
+                    delay = self._close_delay(empty_closes)
+                except Exception as exc:
+                    delay, refresh_needed = self._prepare_restart(
+                        exc, yielded_in_run, failures + 1, token_refreshed, policy.arefresh_token is not None
+                    )
+                    if refresh_needed:
+                        await policy.arefresh_token(getattr(exc, 'rejected_token', None))
+                        token_refreshed = True
                     else:
-                        warnings.warn(
-                            f"Got exception: {e}, reconnecting, retry in {self._initial_delay} seconds", RuntimeWarning
-                        )
-                        await asyncio.sleep(self._initial_delay)
-                    continue
+                        # A run that ended with a refreshable 401 does not consume an attempt
+                        failures += 1
                 finally:
-                    # Ensure the underlying async generator is properly closed when the
-                    # consumer stops iterating or when we plan to reconnect. This avoids
-                    # leaking aiohttp sessions/websockets and prevents 'Unclosed client session'.
-                    try:
-                        await agen.aclose()
-                    except Exception:
-                        pass
-                warnings.warn(f"The connection was closed. Reconnecting", RuntimeWarning)
+                    # Close the underlying async generator before reconnecting or when the consumer stops
+                    # iterating, so that aiohttp sessions and websockets do not leak
+                    if hasattr(agen, 'aclose'):
+                        try:
+                            await agen.aclose()
+                        except Exception:
+                            pass
+                if delay > 0:
+                    await policy.asleep(delay)
 
         return _wrapper()
 
@@ -419,7 +438,7 @@ class DataAsync(BaseData):
             raise e
 
     async def _asave_csv(self, path: Path):
-        """Asynchronously write the streamed items to a JSON file and then convert it to a CSV file.
+        """Asynchronously write the streamed items to a temporary JSON file and then convert it to a CSV file.
 
         Args:
             path: Target file path (should have a .csv extension).

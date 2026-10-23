@@ -21,12 +21,13 @@ class BaseInterface:
         Args:
             id: Unique identifier of the model instance.
             auth_token: Optional auth token used for API requests; if not provided,
-            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
             **kwargs: Additional fields which will be set as attributes of the instance with possible type conversions
-            according to the type hints of the child class.
+                according to the type hints of the child class.
         """
         self.id = id
-        self._auth_token = auth_token
+        # An empty token means the SDK-managed token, as in Communicator
+        self._auth_token = auth_token or None
         self._hints = get_type_hints(self.__class__)
         for key, value in kwargs.items():
             setattr(self, key, self._try_convert_value(key, value))
@@ -115,7 +116,6 @@ class BaseInterface:
         Raises:
             APICompatibilityError: If the value cannot be converted to the hinted type.
         """
-        # TODO: Reimplement using pydantic
         if value is None:
             return None
         if key in self._hints and not isinstance(value, self._hints[key]):
@@ -125,8 +125,8 @@ class BaseInterface:
                 if issubclass(self._hints[key], BaseInterface) and isinstance(value, dict):
                     return self._hints[key](**value)
                 return self._hints[key](value)
-            except TypeError:
-                raise APICompatibilityError(f"Can not convert {key}={value}: to {self._hints[key]}")
+            except (TypeError, ValueError) as exc:
+                raise APICompatibilityError(f"Can not convert {key}={value}: to {self._hints[key]}") from exc
         return value
 
     @classmethod
@@ -136,7 +136,7 @@ class BaseInterface:
         Args:
             id: Identifier of the object to fetch.
             auth_token: Optional auth token; if not provided,
-            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
             as_dict: If True, return raw JSON dict instead of a model instance.
             **filters: Extra query parameters passed to the HTTP request.
 
@@ -148,12 +148,12 @@ class BaseInterface:
         return cls._build_single_from_response(json_response, id=id, auth_token=auth_token, as_dict=as_dict)
 
     @classmethod
-    def get_models(cls, auth_token: str = None, as_dict=False, **filters) -> "BaseInterface | list[dict]":
+    def get_models(cls, auth_token: str = None, as_dict=False, **filters) -> "list[BaseInterface] | list[dict]":
         """Fetch a collection of models from the API.
 
         Args:
             auth_token: Optional auth token; if not provided,
-            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
             as_dict: If True, return raw JSON list instead of model instances.
             **filters: Extra query parameters passed to the HTTP request.
 
@@ -171,7 +171,7 @@ class BaseInterface:
         Args:
             id: Identifier of the object to fetch.
             auth_token: Optional auth token; if not provided,
-            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
             as_dict: If True, return raw JSON dict instead of a model instance.
             **filters: Extra query parameters passed to the HTTP request.
 
@@ -188,7 +188,7 @@ class BaseInterface:
 
         Args:
             auth_token: Optional auth token; if not provided,
-            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
             as_dict: If True, return raw JSON list instead of model instances.
             **filters: Extra query parameters passed to the HTTP request.
 

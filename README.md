@@ -9,6 +9,8 @@ This project provides a convenient Python SDK for interacting with the Restream 
 
 ## Installation and Build
 
+The SDK requires Python 3.11 or newer.
+
 Install from PyPI:
 
 ```bash
@@ -81,7 +83,7 @@ token = auth.get_access_token()
 # You can pass the token to SDK methods or constructors explicitly if you prefer
 pads = Pad.get_models(auth_token=token)
 site = Site(id=123, auth_token=token)
-states = site.get_states()
+state = site.get_state()
 
 # Option 2: provide credentials directly (overrides env vars)
 other_token = auth.get_access_token(client_id="id", client_secret="secret", force=True)
@@ -532,9 +534,16 @@ for stage in stages_from_range[:3]:
 
 # Get stages with a specific stage number and stage name
 stages_by_number = site.get_stages_metadata(stage_number=1, stage_name_filter=StageNameFilters.WIRELINE)
+
+# Get several stages at once
+selected_stages = site.get_stages_metadata(stage_numbers=[1, 2, 3], stage_name_filter=StageNameFilters.FRAC)
 ```
 
-You can also include aggregated metrics for each stage by setting `add_aggregations=True`.
+Note: for a site, the response also contains the current, unfinished stage. It has no `id` and no `end`.
+
+You can also include aggregated metrics for each stage by setting `add_aggregations=True`. Use `aggregations_filter`
+(a comma-separated list of aggregation names) to request only some of them; the available names are returned by
+`get_stages_aggregations()`, see the "Stage aggregations" section.
 
 ```python
 from datetime import datetime, timezone
@@ -544,10 +553,11 @@ site = Site(id=1113)
 start_date = datetime(2025, 9, 17, 0, 0, 0, tzinfo=timezone.utc)
 end_date = datetime(2025, 9, 18, 0, 0, 0, tzinfo=timezone.utc)
 stages_with_aggregations = site.get_stages_metadata(
-    start_date=start_date,
-    end_date=end_date,
+    start=start_date,
+    end=end_date,
     stage_name_filter=StageNameFilters.FRAC,
-    add_aggregations=True
+    add_aggregations=True,
+    aggregations_filter='total_clean_volume,avg_clean_rate',
 )
 for stage in stages_with_aggregations[:3]:
     print(f"ID: {stage['id']}, Aggregations: {stage['aggregations']}")
@@ -696,6 +706,8 @@ for event in change_events:
     event.confirm_data_received()
 ```
 
+Pass `get_acknowledged=True` to include the events that were already confirmed, for example for auditing.
+
 You can also fetch the data for a single, specific change event.
 
 ```python
@@ -824,12 +836,58 @@ for item in live_only_stream.data_fetcher:
 - If your whole Python process crashes or is restarted, you may want to resume from where you left off to avoid missing updates. To do so, persist the session_key returned as the second value from the method call (e.g., `data, session_key = pad.get_realtime_measurements_data(...)`) in a durable store (database, etc.), and supply it on the next start.
 - **Never create multiple concurrent connections that use the same session_key**. Doing so can lead to incorrect results or duplicated messages for each connected client.
 
+## Error handling and retries
+
+All SDK exceptions live in `restreamsolutions.exceptions` and inherit from `RestreamError`:
+
+| Exception                 | When it is raised                                                          |
+|---------------------------|----------------------------------------------------------------------------|
+| `CredentialsError`        | `client_id`/`client_secret` are missing or rejected by the token endpoint  |
+| `AuthError`               | HTTP 401: the access token is invalid or expired; HTTP 403 on a WebSocket handshake: the token is invalid, expired or has no access to the pad or site |
+| `ForbiddenError`          | HTTP 403 on a regular request: the client has no access to the requested pad or site (subclass of `AuthError`) |
+| `NotFoundError`           | HTTP 404: the object or the endpoint does not exist (subclass of `APICompatibilityError`) |
+| `BadRequestError`         | HTTP 400 and other 4xx responses: the request itself is wrong             |
+| `APIConcurrencyLimitError`| HTTP 429: the per-client concurrency limit was exceeded                   |
+| `ServerError`             | HTTP 5xx                                                                   |
+| `APICompatibilityError`   | The response does not match what this version of the SDK expects          |
+| `WebsocketError`          | A WebSocket protocol error                                                 |
+
+The same retry rules apply to requests, HTTP streams and WebSocket connections:
+- never retried: credential and API compatibility errors, HTTP 400, 403 and 404, `ValueError` and `TypeError`;
+- HTTP 401 is retried once after requesting a new access token, but only when the token is managed by the SDK
+  (no explicit `auth_token` was passed; an empty token counts as no token); with an explicit token `AuthError` is
+  raised immediately. A WebSocket handshake rejected with HTTP 403 is handled the same way, because the server rejects
+  invalid tokens with 403 there. The refresh corrects the request rather than repeating it, so it does not consume an
+  attempt;
+- when several requests are rejected with the same token at once, only one new token is requested;
+- HTTP 429 is retried after at least the delay from the `Retry-After` header, when it is present; the header value is
+  honoured up to `RETRY_AFTER_MAX_SECONDS`;
+- any other error (connection and DNS failures, timeouts, TLS errors, HTTP 5xx, etc.) is retried with exponential
+  backoff and jitter; a single delay never exceeds `RETRY_MAX_DELAY_SECONDS`;
+- POST requests are treated as non-idempotent unless `idempotent=True` is passed to `Communicator.send_post_request()`:
+  requests that create objects (`create_stages_aggregations()`) are repeated only when the server could not have processed
+  them (connection errors, HTTP 401 and 429), so a retry never creates duplicates. Acknowledging data changes is
+  idempotent and follows the regular rules.
+
+Streams returned by `get_data()`/`aget_data()` reconnect only while nothing has been delivered yet; an error in the
+middle of a stream is propagated, because a restart would re-send the records you already consumed. WebSocket streams
+reconnect indefinitely when `restart_on_error`/`restart_on_close` are enabled (the default); while the server keeps
+closing a WebSocket without sending data, the delay between reconnections grows.
+
+The maximum number of attempts is defined by `MAX_RETRY_ATTEMPTS` in `restreamsolutions/constants.py` and can be
+overridden at runtime with the `RESTREAM_MAX_RETRY_ATTEMPTS` environment variable (a positive integer; `1` disables
+retries, but the single token refresh after HTTP 401 is still performed). The delays are controlled by
+`RETRY_INITIAL_DELAY_SECONDS`, `RETRY_BACKOFF_FACTOR`, `RETRY_MAX_DELAY_SECONDS`, `RETRY_AFTER_MAX_SECONDS` and
+`RETRY_JITTER`. Retries and reconnections are reported through the standard `logging` module under the
+`restreamsolutions` logger at the WARNING level.
+
 ## Running tests
 
-Run from the repository root folder
+The test suite starts a local fake of the ReStream API, so no credentials or network access are needed.
+Run from the repository root folder:
 
 ```shell
-pytest
+poetry run pytest
 ```
 
 ## License
