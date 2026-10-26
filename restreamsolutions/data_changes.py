@@ -1,4 +1,4 @@
-import warnings
+import logging
 from datetime import datetime
 from typing import Any
 from dateutil import parser
@@ -8,6 +8,8 @@ from restreamsolutions.communicator import Communicator
 from restreamsolutions.constants import ENDPOINTS
 from restreamsolutions.exceptions import APICompatibilityError
 from .data_object import Data, DataAsync
+
+logger = logging.getLogger(__name__)
 
 
 class DataChanges(BaseInterface):
@@ -111,9 +113,7 @@ class DataChanges(BaseInterface):
             or 'change_log' not in response_data
             or not isinstance(response_data['change_log'], list)
         ):
-            raise APICompatibilityError(
-                f'change_log must be a list of dicts, but received {response_data["change_log"]}'
-            )
+            raise APICompatibilityError(f'change_log must be a list of dicts, but received: {response_data}')
 
         new_instance_dict = {}
         for change_log in response_data['change_log']:
@@ -206,11 +206,12 @@ class DataChanges(BaseInterface):
             becomes True), False otherwise.
         """
         if self.update_received:
-            warnings.warn(f"{str(self)} - confirmation has already been received.")
+            logger.warning('%s: confirmation has already been received', self)
             return True
         payload = self._create_confirm_data_received_payload()
         url = self._build_url()
-        response_data = Communicator.send_post_request(url, payload, auth_token=self._auth_token)
+        # Confirming the same event again changes nothing on the server, so the request may be repeated safely
+        response_data = Communicator.send_post_request(url, payload, auth_token=self._auth_token, idempotent=True)
         self._update_self_state(response_data)
         return self.update_received
 
@@ -226,11 +227,14 @@ class DataChanges(BaseInterface):
             becomes True), False otherwise.
         """
         if self.update_received:
-            warnings.warn(f"{str(self)} - confirmation has already been received.")
+            logger.warning('%s: confirmation has already been received', self)
             return True
         payload = self._create_confirm_data_received_payload()
         url = self._build_url()
-        response_data = await Communicator.send_post_request_async(url, payload, auth_token=self._auth_token)
+        # Confirming the same event again changes nothing on the server, so the request may be repeated safely
+        response_data = await Communicator.send_post_request_async(
+            url, payload, auth_token=self._auth_token, idempotent=True
+        )
         self._update_self_state(response_data)
         return self.update_received
 
@@ -289,7 +293,7 @@ class DataChanges(BaseInterface):
         Args:
             raw_changes: Raw change entries from the API change log.
             auth_token: Optional auth token for downstream data requests; if not provided,
-            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
 
         Returns:
             Data: A lazy iterable over all affected data across sites/intervals.
@@ -297,6 +301,12 @@ class DataChanges(BaseInterface):
         intervals_by_site = DataChanges._group_and_merge_intervals_by_site(raw_changes)
 
         def data_generator_factory():
+            """Fetch the data of every merged interval of every affected site one after another.
+
+            Yields:
+                Data records of the affected intervals.
+            """
+            # Imported here to avoid a circular import: the site module depends on this module
             from .site import Site
 
             for site_id in sorted(intervals_by_site.keys()):
@@ -318,7 +328,7 @@ class DataChanges(BaseInterface):
         Args:
             raw_changes: Raw change entries from the API change log.
             auth_token: Optional auth token for downstream data requests; if not provided,
-            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
 
         Returns:
             DataAsync: A lazy async iterable over all affected data across sites/intervals.
@@ -326,6 +336,12 @@ class DataChanges(BaseInterface):
         intervals_by_site = DataChanges._group_and_merge_intervals_by_site(raw_changes)
 
         async def data_generator_factory():
+            """Fetch the data of every merged interval of every affected site one after another.
+
+            Yields:
+                Data records of the affected intervals.
+            """
+            # Imported here to avoid a circular import: the site module depends on this module
             from .site import Site
 
             for site_id in sorted(intervals_by_site.keys()):

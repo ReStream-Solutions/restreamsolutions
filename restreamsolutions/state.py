@@ -67,7 +67,7 @@ class State(BaseInterface):
         """Retrieve State models for a site or for a pad.
 
 
-        Parameters:
+        Args:
           - stage_name_filter (StageNameFilters | None): When provided, restricts results to
             states whose current_state matches the given stage name pattern (e.g., frac, wireline).
           - auth_token: Optional auth token used for API requests; if not provided,
@@ -97,11 +97,11 @@ class State(BaseInterface):
         """Asynchronously retrieve State models for a site or for a pad.
 
 
-        Parameters:
+        Args:
           - stage_name_filter (StageNameFilters | None): When provided, restricts results to
             states whose current_state matches the given stage name pattern (e.g., frac, wireline).
-          - auth_token (str | None): Explicit auth token. If None, the SDK will attempt to use
-            RESTREAM_AUTH_TOKEN environment variable.
+          - auth_token (str | None): Optional auth token used for API requests; if not provided,
+            RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
           - as_dict (bool): If True, return a list of plain dictionaries instead of State instances.
           - **filters: Additional server-side filters (e.g., pad__id, site__id) passed through
             to the HTTP request and supported by the API.

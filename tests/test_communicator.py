@@ -1,924 +1,343 @@
-import datetime
-import types
-from decimal import Decimal
-import json
 import asyncio
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from email.utils import format_datetime
+from enum import Enum
 
 import pytest
-import requests
-import httpx
 
-from restreamsolutions.communicator import Communicator, Authorization, RestreamToken
-from restreamsolutions.exceptions import AuthError, APICompatibilityError, APIConcurrencyLimitError, ServerError
+from restreamsolutions.communicator import Authorization, Communicator
+from restreamsolutions.exceptions import (
+    APICompatibilityError,
+    APIConcurrencyLimitError,
+    AuthError,
+    BadRequestError,
+    ForbiddenError,
+    NotFoundError,
+    ServerError,
+)
+from tests.fake_api.server import API_PREFIX, TEST_STREAM_PATH, WS_PREFIX
+
+SITE_ID = 1112
+SITE_WS_PATH = f'{WS_PREFIX}/sites/{SITE_ID}/'
+SITE_DATA_WS_PATH = f'{WS_PREFIX}/sites/{SITE_ID}/data/'
+
+
+class _Color(Enum):
+    RED = 'red'
 
 
 # ------------------------
-# Helpers
+# Pure helpers
 # ------------------------
 
 
-def make_requests_response(status: int, payload):
-    resp = requests.Response()
-    resp.status_code = status
-    body = json.dumps(payload).encode("utf-8")
-    resp._content = body
-    resp.headers["Content-Type"] = "application/json"
-    return resp
+def test_build_query_params_normalizes_values():
+    """Query params skip None, expand lists and convert booleans and enums; URLs keep their existing query."""
+    params = {'none': None, 'ids': [1, None, 2], 'flag': True, 'off': False, 'enum': _Color.RED, 'text': 'x'}
+
+    query = Communicator._build_query_params(params)
+
+    assert query == [('ids', '1'), ('ids', '2'), ('flag', 'true'), ('off', 'false'), ('enum', 'red'), ('text', 'x')]
+    assert Communicator._add_query_params('wss://h/ws?x=1', {'k': 'v', 'skip': None}) == 'wss://h/ws?x=1&k=v'
+    assert Communicator._add_query_params('wss://h/ws', None) == 'wss://h/ws'
 
 
-def make_httpx_response(status: int, payload):
-    # Provide a dummy request so that response.raise_for_status() is callable
-    req = httpx.Request("GET", "https://dummy")
-    return httpx.Response(status_code=status, json=payload, request=req)
+@pytest.mark.parametrize(
+    'status, exception',
+    [
+        (401, AuthError),
+        (403, ForbiddenError),
+        (404, NotFoundError),
+        (429, APIConcurrencyLimitError),
+        (400, BadRequestError),
+        (418, BadRequestError),
+        (500, ServerError),
+        (502, ServerError),
+        (504, ServerError),
+    ],
+)
+def test_status_code_mapping(status, exception):
+    """Error statuses are mapped to SDK exceptions, most with the URL and the server detail; success codes pass."""
+    with pytest.raises(exception) as excinfo:
+        Communicator._check_response_status_code(status, {}, '{"detail": "boom"}', 'http://h/x/')
+    if status not in (401, 429):
+        assert 'http://h/x/' in str(excinfo.value)
+        assert 'boom' in str(excinfo.value)
+    if hasattr(excinfo.value, 'status_code'):
+        assert excinfo.value.status_code == status
+
+    # Success codes pass silently
+    Communicator._check_response_status_code(200, {}, '', 'http://h/x/')
+    Communicator._check_response_status_code(204, None, None, 'http://h/x/')
 
 
-def fake_get_factory(response, expected_url=None, expected_params=None, expected_headers=None):
-    """Factory for a requests.get stub with optional assertions."""
-
-    def _fake_get(u, params=None, headers=None, **kwargs):
-        if expected_url is not None:
-            assert u == expected_url
-        if expected_params is not None:
-            assert params == expected_params
-        if expected_headers is not None:
-            assert headers == expected_headers
-        return response
-
-    return _fake_get
+def test_auth_error_carries_the_rejected_token():
+    """HTTP 401 keeps the rejected token on the exception without exposing it in the message."""
+    with pytest.raises(AuthError) as excinfo:
+        Communicator._check_response_status_code(401, {}, '', 'http://h/x/', 'secret-token')
+    assert excinfo.value.rejected_token == 'secret-token'
+    assert 'secret-token' not in str(excinfo.value)
+    assert 'secret-token' not in repr(excinfo.value)
 
 
-def fake_post_factory(response, expected_url=None, expected_params=None, expected_headers=None, expected_json=None):
-    """Factory for a requests.post stub with optional assertions."""
+def test_retry_after_parsing():
+    """Retry-After is parsed from seconds or an HTTP date in any header case and is attached to the 429 error."""
+    assert Communicator._parse_retry_after({'Retry-After': '12'}) == 12.0
+    assert Communicator._parse_retry_after({'Retry-After': '-3'}) == 0.0
+    assert Communicator._parse_retry_after({}) is None
+    assert Communicator._parse_retry_after(None) is None
+    assert Communicator._parse_retry_after({'Retry-After': 'garbage'}) is None
+    # Non-finite numbers would break the sleep, so they are treated as a missing header
+    assert Communicator._parse_retry_after({'Retry-After': 'inf'}) is None
+    assert Communicator._parse_retry_after({'Retry-After': 'nan'}) is None
+    # websocket-client passes handshake headers as a plain dict with lower-case names
+    assert Communicator._parse_retry_after({'retry-after': '7'}) == 7.0
+    retry_at = datetime.now(timezone.utc) + timedelta(seconds=30)
+    http_date = format_datetime(retry_at, usegmt=True)
+    assert 25 <= Communicator._parse_retry_after({'Retry-After': http_date}) <= 30
+    # The -0000 zone is parsed as a naive datetime and must be treated as UTC, not as local time
+    naive_utc_date = format_datetime(retry_at.replace(tzinfo=None))
+    assert naive_utc_date.endswith('-0000')
+    assert 25 <= Communicator._parse_retry_after({'Retry-After': naive_utc_date}) <= 30
 
-    def _fake_post(u, params=None, headers=None, json=None, **kwargs):
-        if expected_url is not None:
-            assert u == expected_url
-        if expected_params is not None:
-            assert params == expected_params
-        if expected_headers is not None:
-            assert headers == expected_headers
-        if expected_json is not None:
-            assert json == expected_json
-        return response
-
-    return _fake_post
-
-
-class DummyAsyncClient:
-    """Reusable dummy for httpx.AsyncClient with injectable callbacks."""
-
-    def __init__(self, get_cb=None, post_cb=None, *args, **kwargs):
-        self._get_cb = get_cb
-        self._post_cb = post_cb
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        return False
-
-    async def get(self, u, params=None, headers=None):
-        if self._get_cb is None:
-            raise RuntimeError("No get_cb provided for DummyAsyncClient")
-        return await self._maybe_await(self._get_cb(u=u, params=params, headers=headers))
-
-    async def post(self, u, params=None, headers=None, json=None, data=None):
-        if self._post_cb is None:
-            raise RuntimeError("No post_cb provided for DummyAsyncClient")
-        return await self._maybe_await(self._post_cb(u=u, params=params, headers=headers, json=json))
-
-    @staticmethod
-    async def _maybe_await(val):
-        if isinstance(val, types.CoroutineType) or hasattr(val, "__await__"):
-            return await val
-        return val
+    with pytest.raises(APIConcurrencyLimitError) as excinfo:
+        Communicator._check_response_status_code(429, {'Retry-After': '5'}, '', 'u')
+    assert excinfo.value.retry_after == 5.0
 
 
-class DummyRaw:
-    """Mimics the .raw attribute of a requests Response for streaming."""
+def test_json_body_parsing_and_value_conversion():
+    """Empty bodies parse to None, non-JSON bodies raise APICompatibilityError and special values are converted."""
+    assert Communicator._parse_json_body('', 'u') is None
+    assert Communicator._parse_json_body(None, 'u') is None
+    assert Communicator._parse_json_body('{"a": 1}', 'u') == {'a': 1}
+    with pytest.raises(APICompatibilityError):
+        Communicator._parse_json_body('<html>', 'u')
 
-    def __init__(self):
-        self.decode_content = False
-
-
-class DummyCtx:
-    """Synchronous context manager that yields a given value."""
-
-    def __init__(self, yield_value):
-        self._yield_value = yield_value
-
-    def __enter__(self):
-        return self._yield_value
-
-    def __exit__(self, exc_type, exc, tb):
-        return False
+    converted = Communicator._convert_values({'a': Decimal('1.5'), 'b': 'Infinity', 'c': 'ok', 'd': None})
+    assert converted == {'a': 1.5, 'b': None, 'c': 'ok', 'd': None}
 
 
-class DummyStream:
-    """Simple object with a .content attribute for aiohttp streaming tests."""
+def test_websocket_message_parsing():
+    """WebSocket messages are parsed into lists of items, optionally unwrapped from a nested key."""
+    parse = Communicator._parse_websocket_message
+    assert parse('', None) == []
+    assert parse('null', None) == []
+    assert parse('{"a": 1}', None) == [{'a': 1}]
+    assert parse('[{"a": 1}, {"a": 2}]', None) == [{'a': 1}, {'a': 2}]
+    assert parse('{"session_key": "k", "message": {"a": 1}}', 'message') == [{'a': 1}]
+    assert parse('{"session_key": "k", "message": [{"a": 1}, {"a": 2}]}', 'message') == [{'a': 1}, {'a': 2}]
+    assert parse(b'raw', 'message') == [b'raw']
+    with pytest.raises(ValueError):
+        parse('not json', None)
+    with pytest.raises(KeyError):
+        parse('{"other": 1}', 'message')
 
-    def __init__(self, content=None):
-        self.content = content if content is not None else object()
+
+# ------------------------
+# HTTP requests against the fake API
+# ------------------------
 
 
-class DummySession:
-    """Lightweight replacement for aiohttp.ClientSession used in tests.
+def test_requests_carry_bearer_token_and_normalized_query(api):
+    """Sync and async GET requests send the cached bearer token and the normalized query."""
+    url = f'{api.base_url}{API_PREFIX}/sites/{SITE_ID}/aggregations/'
 
-    Provides a .get(...) method returning an async context manager that yields a DummyStream.
+    payload = Communicator.send_get_request(url, histories=[1, 2], complete=True, skipped=None)
+    async_payload = asyncio.run(Communicator.send_get_request_async(url, histories=[1, 2], complete=True, skipped=None))
+
+    assert payload == async_payload
+    assert api.count('GET', f'{API_PREFIX}/sites/{SITE_ID}/aggregations/') == 2
+    for request in api.requests[-2:]:
+        assert request.bearer_token == Authorization().get_access_token()
+        assert request.query == {'histories': ['1', '2'], 'complete': ['true']}
+    assert api.token_requests == 1
+
+
+def test_write_requests_send_json_payload_and_delete_returns_none(api):
+    """POST, PATCH and PUT requests send JSON bodies and return the response; DELETE returns None."""
+    url = f'{api.base_url}{API_PREFIX}/pads/697/parameters/'
+    body = [{'name': 'p', 'config': {'field': 'f', 'aggregation': 'average'}}]
+
+    created = Communicator.send_post_request(url, body)
+    assert created[0]['name'] == 'p'
+    assert api.last('POST', f'{API_PREFIX}/pads/697/parameters/').body == body
+
+    one_url = f'{url}{created[0]["id"]}/'
+    patched = Communicator.send_patch_request(one_url, {'description': 'd'})
+    assert patched['description'] == 'd'
+    assert api.last('PATCH', f'{API_PREFIX}/pads/697/parameters/{created[0]["id"]}/').body == {'description': 'd'}
+
+    replaced = asyncio.run(Communicator.send_put_request_async(one_url, {'config': {'field': 'g'}}))
+    assert replaced['config'] == {'field': 'g'}
+    assert replaced['description'] == ''
+
+    assert Communicator.send_delete_request(one_url) is None
+    with pytest.raises(NotFoundError):
+        asyncio.run(Communicator.send_delete_request_async(one_url))
+
+
+@pytest.mark.parametrize('is_async', [False, True], ids=['sync', 'async'])
+def test_streaming_generators_convert_values(api, is_async):
+    """Streaming generators send the streaming header and the query and yield items with converted values."""
+    url = f'{api.base_url}{TEST_STREAM_PATH}'
+
+    if is_async:
+
+        async def _collect():
+            """Read the async streaming generator to the end.
+
+            Returns:
+                The list of streamed items.
+            """
+            return [item async for item in Communicator.streaming_get_generator_async(url, extra='1')]
+
+        items = asyncio.run(_collect())
+    else:
+        items = list(Communicator.streaming_get_generator(url, extra='1'))
+
+    assert items == [{'a': 1.5, 'b': None}, {'a': 2, 'b': 'ok'}]
+    assert isinstance(items[0]['a'], float)
+    request = api.last('GET', TEST_STREAM_PATH)
+    assert request.headers['Prefer'] == 'streaming'
+    assert request.query == {'extra': ['1']}
+
+
+@pytest.mark.parametrize('is_async', [False, True], ids=['sync', 'async'])
+@pytest.mark.parametrize(
+    'status, exception',
+    [
+        (401, AuthError),
+        (403, ForbiddenError),
+        (404, NotFoundError),
+        (429, APIConcurrencyLimitError),
+        (500, ServerError),
+    ],
+)
+def test_streaming_generators_map_error_statuses(api, is_async, status, exception):
+    """Error statuses of a streaming request are mapped to the same SDK exceptions as regular requests."""
+    url = f'{api.base_url}{TEST_STREAM_PATH}'
+    api.plan('GET', TEST_STREAM_PATH, status)
+
+    with pytest.raises(exception):
+        if is_async:
+
+            async def _collect():
+                """Read the async streaming generator to the end.
+
+                Returns:
+                    The list of streamed items.
+                """
+                return [item async for item in Communicator.streaming_get_generator_async(url)]
+
+            asyncio.run(_collect())
+        else:
+            list(Communicator.streaming_get_generator(url))
+
+
+# ------------------------
+# WebSockets against the fake API
+# ------------------------
+
+
+def _ws_url(api, path: str) -> str:
+    """Build a WebSocket URL to the fake API server.
+
+    Args:
+        api: The running fake API server.
+        path: WebSocket path without the host.
+
+    Returns:
+        The ws URL of the path.
     """
+    return f'{api.base_url}{path}'.replace('http://', 'ws://')
 
-    async def __aenter__(self):
-        return self
 
-    async def __aexit__(self, exc_type, exc, tb):
-        return False
+@pytest.mark.parametrize('is_async', [False, True], ids=['sync', 'async'])
+def test_websocket_generators_yield_decoded_messages(api, is_async):
+    """WebSocket generators send the auth and extra headers and yield decoded messages, skipping empty ones."""
+    api.ws_scripts[SITE_WS_PATH] = ['{"k": 1}', '', '[{"k": 2}, {"k": 3}]', 'null', {'k': 4}]
+    api.ws_scripts[SITE_DATA_WS_PATH] = [{'v': 1}, [{'v': 2}, {'v': 3}]]
+    headers = [{'X-Test': 'yes'}]
 
-    def get(self, *args, **kwargs):
-        stream = DummyStream()
+    if is_async:
 
-        class _Ctx:
-            async def __aenter__(self_inner):
-                return stream
+        async def _collect(url, **kwargs):
+            """Read the async WebSocket generator to the end.
 
-            async def __aexit__(self_inner, exc_type, exc, tb):
-                return False
+            Args:
+                url: WebSocket URL to connect to.
+                **kwargs: Arguments forwarded to websocket_generator_async.
 
-        return _Ctx()
+            Returns:
+                The list of received messages.
+            """
+            return [item async for item in Communicator.websocket_generator_async(url, **kwargs)]
 
-
-# ------------------------
-# Sync GET
-# ------------------------
-
-
-def test_send_get_request_success(monkeypatch):
-    url = "https://example.com/items"
-    token = "abc"
-    payload = {"ok": True, "items": [1, 2, 3]}
-
-    monkeypatch.setattr(
-        requests,
-        "get",
-        fake_get_factory(
-            response=make_requests_response(200, payload),
-            expected_url=url,
-            expected_params={"q": "x"},
-            expected_headers={"Authorization": f"Bearer {token}"},
-        ),
-    )
-
-    out = Communicator.send_get_request(url, auth_token=token, q="x")
-    assert out == payload
-
-
-def test_send_get_request_auth_error(monkeypatch):
-    def fake_get(u, params=None, headers=None):
-        return make_requests_response(401, {"detail": "unauthorized"})
-
-    monkeypatch.setattr(requests, "get", fake_get)
-
-    with pytest.raises(AuthError):
-        Communicator.send_get_request("https://e", auth_token="tok")
-
-
-def test_send_get_request_not_found(monkeypatch):
-    def fake_get(u, params=None, headers=None):
-        return make_requests_response(404, {"detail": "missing"})
-
-    monkeypatch.setattr(requests, "get", fake_get)
-
-    with pytest.raises(APICompatibilityError):
-        Communicator.send_get_request("https://e", auth_token="tok")
-
-
-def test_send_get_request_rate_limited(monkeypatch):
-    def fake_get(u, params=None, headers=None):
-        return make_requests_response(429, {"detail": "rate limited"})
-
-    monkeypatch.setattr(requests, "get", fake_get)
-
-    with pytest.raises(APIConcurrencyLimitError):
-        Communicator.send_get_request("https://e", auth_token="tok")
-
-
-def test_send_get_request_other_error(monkeypatch):
-    def fake_get(u, params=None, headers=None):
-        # 500 -> should propagate Response.raise_for_status() as HTTPError
-        return make_requests_response(500, {"detail": "oops"})
-
-    monkeypatch.setattr(requests, "get", fake_get)
-
-    with pytest.raises(ServerError):
-        Communicator.send_get_request("https://e", auth_token="tok")
-
-
-# ------------------------
-# Sync POST
-# ------------------------
-
-
-def test_send_post_request_success(monkeypatch):
-    url = "https://example.com/create"
-    token = "abc"
-    payload = {"id": 1}
-
-    monkeypatch.setattr(
-        requests,
-        "post",
-        fake_post_factory(
-            response=make_requests_response(200, payload),
-            expected_url=url,
-            expected_headers={"Authorization": f"Bearer {token}"},
-            expected_json={"name": "Bob"},
-        ),
-    )
-
-    out = Communicator.send_post_request(url, {"name": "Bob"}, auth_token=token)
-    assert out == payload
-
-
-def test_send_post_request_error_mapping(monkeypatch):
-    cases = [
-        (401, AuthError),
-        (403, AuthError),
-        (404, APICompatibilityError),
-        (429, APIConcurrencyLimitError),
-    ]
-
-    for status, exc in cases:
-
-        def fake_post(u, params=None, headers=None, json=None, _status=status):
-            return make_requests_response(_status, {})
-
-        monkeypatch.setattr(requests, "post", fake_post, raising=True)
-        with pytest.raises(exc):
-            Communicator.send_post_request("https://e", {}, auth_token="tok")
-
-    # other error
-    def fake_post_500(u, params=None, headers=None, json=None):
-        return make_requests_response(500, {})
-
-    monkeypatch.setattr(requests, "post", fake_post_500)
-    with pytest.raises(ServerError):
-        Communicator.send_post_request("https://e", {}, auth_token="tok")
-
-
-# ------------------------
-# Async GET/POST
-# ------------------------
-@pytest.mark.asyncio
-async def test_send_get_request_async_success(monkeypatch):
-    url = "https://api/x"
-    token = "t"
-    payload = {"x": 1}
-
-    async def get_cb(u, params=None, headers=None):
-        assert u == url
-        assert headers == {"Authorization": f"Bearer {token}"}
-        return make_httpx_response(200, payload)
-
-    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(get_cb=get_cb))
-
-    out = await Communicator.send_get_request_async(url, auth_token=token)
-    assert out == payload
-
-
-@pytest.mark.asyncio
-async def test_send_get_request_async_error_mapping(monkeypatch):
-    async def run_status(status, expected_exc):
-        async def get_cb(u, params=None, headers=None):
-            return make_httpx_response(status, {})
-
-        monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(get_cb=get_cb))
-        if expected_exc is None:
-            with pytest.raises(httpx.HTTPStatusError):
-                await Communicator.send_get_request_async("https://e", auth_token="t")
-        else:
-            with pytest.raises(expected_exc):
-                await Communicator.send_get_request_async("https://e", auth_token="t")
-
-    for status, exc in [
-        (401, AuthError),
-        (403, AuthError),
-        (404, APICompatibilityError),
-        (429, APIConcurrencyLimitError),
-        (500, ServerError),
-    ]:
-        await run_status(status, exc)
-
-
-@pytest.mark.asyncio
-async def test_send_post_request_async_success(monkeypatch):
-    payload = {"ok": True}
-
-    async def post_cb(u, params=None, headers=None, json=None):
-        assert json == {"n": 1}
-        return make_httpx_response(200, payload)
-
-    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(post_cb=post_cb))
-
-    out = await Communicator.send_post_request_async("https://e", {"n": 1}, auth_token="t")
-    assert out == payload
-
-
-@pytest.mark.asyncio
-async def test_send_post_request_async_error_mapping(monkeypatch):
-    async def run_status(status, expected_exc):
-        async def post_cb(u, params=None, headers=None, json=None):
-            return make_httpx_response(status, {})
-
-        monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: DummyAsyncClient(post_cb=post_cb))
-        if expected_exc is None:
-            with pytest.raises(httpx.HTTPStatusError):
-                await Communicator.send_post_request_async("https://e", {}, auth_token="t")
-        else:
-            with pytest.raises(expected_exc):
-                await Communicator.send_post_request_async("https://e", {}, auth_token="t")
-
-    for status, exc in [
-        (401, AuthError),
-        (403, AuthError),
-        (404, APICompatibilityError),
-        (429, APIConcurrencyLimitError),
-        (500, ServerError),
-    ]:
-        await run_status(status, exc)
-
-
-# ------------------------
-# Streaming (sync)
-# ------------------------
-
-
-def test_steaming_get_generator_yields_converted_items(monkeypatch):
-    # Prepare a fake streaming Response that passes isinstance(Response)
-    stream_resp = make_requests_response(200, [])
-
-    # patch raw so that ijson.items can be called; but we will patch ijson.items to ignore input
-    stream_resp.raw = DummyRaw()
-
-    # Patch requests.get to return a context manager yielding our response
-    def fake_get(u, params=None, headers=None, stream=None, timeout=None):
-        assert stream is True
-        return DummyCtx(stream_resp)
-
-    monkeypatch.setattr(requests, "get", fake_get)
-
-    # Patch ijson.items to yield two objects
-    import ijson as _ijson
-
-    def fake_items(source, prefix):
-        for obj in [
-            {"a": Decimal("1.5"), "b": "ok"},
-            {"a": 2, "b": "Infinity"},
-        ]:
-            yield obj
-
-    monkeypatch.setattr(_ijson, "items", fake_items)
-
-    out = list(Communicator.steaming_get_generator("https://e", "t"))
-    assert out == [
-        {"a": 1.5, "b": "ok"},
-        {"a": 2, "b": None},
-    ]
-
-
-def test_steaming_get_generator_error_mapping(monkeypatch):
-    # Use various statuses to ensure mapping
-    def run_status(status, expected_exc):
-        stream_resp = make_requests_response(status, [])
-
-        def fake_get(u, params=None, headers=None, stream=None, timeout=None):
-            return DummyCtx(stream_resp)
-
-        monkeypatch.setattr(requests, "get", fake_get)
-        if expected_exc is None:
-            with pytest.raises(requests.HTTPError):
-                list(Communicator.steaming_get_generator("https://e", "t"))
-        else:
-            with pytest.raises(expected_exc):
-                list(Communicator.steaming_get_generator("https://e", "t"))
-
-    for status, exc in [
-        (401, AuthError),
-        (403, AuthError),
-        (404, APICompatibilityError),
-        (429, APIConcurrencyLimitError),
-        (500, ServerError),
-    ]:
-        run_status(status, exc)
-
-
-# ------------------------
-# Streaming (async)
-# ------------------------
-@pytest.mark.asyncio
-async def test_steaming_get_generator_async_yields_converted_items(monkeypatch):
-    # We'll bypass strict type checking by patching Communicator._check_response_status_code to no-op
-    monkeypatch.setattr(Communicator, "_check_response_status_code", lambda _r: None)
-
-    # Fake session.get async context manager returning an object with .content
-    import aiohttp as _aiohttp
-
-    monkeypatch.setattr(_aiohttp, "ClientSession", lambda timeout=None: DummySession())
-
-    # Patch ijson.items to return an async iterator
-    import ijson as _ijson
-
-    async def async_gen():
-        for obj in [
-            {"a": Decimal("2.5")},
-            {"a": "Infinity"},
-        ]:
-            await asyncio.sleep(0)
-            yield obj
-
-    monkeypatch.setattr(_ijson, "items", lambda source, prefix: async_gen())
-
-    items = []
-    async for obj in Communicator.steaming_get_generator_async("https://e", "t"):
-        items.append(obj)
-
-    assert items == [{"a": 2.5}, {"a": None}]
-
-
-@pytest.mark.asyncio
-async def test_steaming_get_generator_async_error_mapping(monkeypatch):
-    # Here we simulate that _check_response_status_code raises specific exceptions
-    def make_check(exc):
-        def _check(_):
-            if isinstance(exc, type) and issubclass(exc, Exception):
-                raise exc()
-            # Otherwise raise HTTPStatus-like error by mimicking raise_for_status behavior
-
-        return _check
-
-    for exc in [AuthError, APICompatibilityError, APIConcurrencyLimitError]:
-        monkeypatch.setattr(Communicator, "_check_response_status_code", make_check(exc))
-
-        import aiohttp as _aiohttp
-
-        monkeypatch.setattr(_aiohttp, "ClientSession", lambda timeout=None: DummySession())
-
-        with pytest.raises(exc):
-            async for _ in Communicator.steaming_get_generator_async("https://e", "t"):
-                pass
-
-
-# ------------------------
-# WebSocket tests
-# ------------------------
-
-
-def test_websocket_generator_yields_and_acks_and_closes(monkeypatch):
-    import restreamsolutions.communicator as comm_module
-
-    sent = []
-    closed = {"flag": False}
-    captured = {}
-    recv_queue = ['{"k1":"v1"}', '{"k2":2}', '{"k2":3}', '{"k2":4}', '{"k2":5}', None]
-
-    class DummyWS:
-        def __init__(self, skip_utf8_validation=True):
-            assert skip_utf8_validation is True
-
-        def connect(self, url, header=None):
-            captured["url"] = url
-            captured["header"] = header
-
-        def recv(self):
-            return recv_queue.pop(0)
-
-        def send(self, data):
-            sent.append(data)
-
-        def close(self):
-            closed["flag"] = True
-
-    monkeypatch.setattr(comm_module, "WebSocket", DummyWS)
-
-    gen = comm_module.Communicator.websocket_generator(
-        url="wss://example.org/ws",
-        auth_token="TOKEN123",
-        params={"a": "1"},
-        ack_message={"ack": "true"},
-        additional_headers=[{"X-Test": "Yes"}],
-    )
-
-    out = list(gen)
-
-    # Yields raw messages and sends ACK for each
-    assert out == [{"k1": 'v1'}, {'k2': 2}, {'k2': 3}, {'k2': 4}, {'k2': 5}]
-    assert sent == [json.dumps({"ack": "true"})]
-
-    # Connection closed in finally
-    assert closed["flag"] is True
-
-    # URL base is correct; depending on requests version, ws scheme may not include query params
-    assert captured["url"].startswith("wss://example.org/ws")
-    if "?" in captured["url"]:
-        assert "a=1" in captured["url"]
-
-    # Headers are provided as list of "Key: Value" strings
-    header_list = captured["header"] or []
-    assert any(h.strip() == "Authorization: Bearer TOKEN123" for h in header_list)
-    assert any(h.strip() == "X-Test: Yes" for h in header_list)
-
-
-def test_websocket_generator_stops_on_connection_closed(monkeypatch):
-    import restreamsolutions.communicator as comm_module
-
-    class DummyWSClosed:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def connect(self, url, header=None):
-            pass
-
-        def recv(self):
-            # Simulate server closing the connection
-            raise comm_module.WebSocketConnectionClosedException()
-
-        def send(self, data):
-            pass
-
-        def close(self):
-            DummyWSClosed.closed = True
-
-    DummyWSClosed.closed = False
-
-    monkeypatch.setattr(comm_module, "WebSocket", DummyWSClosed)
-
-    gen = comm_module.Communicator.websocket_generator(
-        url="wss://example.org/ws",
-        auth_token="T",
-    )
-
-    # Should gracefully stop iteration and close the socket
-    assert list(gen) == []
-    assert DummyWSClosed.closed is True
-
-
-async def _collect_async_gen(gen):
-    items = []
-    async for x in gen:
-        items.append(x)
-    return items
-
-
-def test_websocket_generator_async_yields_and_acks_and_close(monkeypatch):
-    import aiohttp
-    import restreamsolutions.communicator as comm_module
-
-    class DummyWS:
-        def __init__(self, seq, on_send_json):
-            self._iter = iter(seq)
-            self._on_send_json = on_send_json
-
-        async def receive(self):
-            try:
-                return next(self._iter)
-            except StopIteration:
-                # After CLOSE, context manager will exit
-                return types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSED, data=None)
-
-        async def send_json(self, payload):
-            self._on_send_json(payload)
-
-    class DummySession:
-        def __init__(self, *args, **kwargs):
-            self.captured = {}
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def ws_connect(self, url, headers=None, params=None):
-            self.captured["url"] = url
-            self.captured["headers"] = headers
-            self.captured["params"] = params
-            # Prepare a sequence of TEXT, BINARY, CLOSE
-            seq = [
-                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v1"}'),
-                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v2"}'),
-                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v3"}'),
-                types.SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data='{"k1":"v4"}'),
-                types.SimpleNamespace(type=aiohttp.WSMsgType.BINARY, data=b'data'),
-                types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSE, data=None),
-            ]
-            ws = DummyWS(seq, on_send_json=lambda p: self.captured.setdefault("acks", []).append(p))
-
-            class _Ctx:
-                async def __aenter__(self_inner):
-                    return ws
-
-                async def __aexit__(self_inner, exc_type, exc, tb):
-                    return False
-
-            return _Ctx()
-
-    # Capture the created session instance for later inspection
-    holder = {}
-    orig_cls = DummySession
-
-    def _factory(*args, **kwargs):
-        inst = orig_cls(*args, **kwargs)
-        holder["session"] = inst
-        return inst
-
-    monkeypatch.setattr(comm_module.aiohttp, "ClientSession", _factory)
-
-    gen = comm_module.Communicator.websocket_generator_async(
-        url="wss://example.org/ws",
-        auth_token="TOKEN-ASYNC",
-        params={"p": "9"},
-        ack_message={"ok": "true"},
-        additional_headers=[{"X-Extra": "Z"}],
-    )
-
-    out = asyncio.run(_collect_async_gen(gen))
-
-    assert out == [{'k1': 'v1'}, {'k1': 'v2'}, {'k1': 'v3'}, {'k1': 'v4'}, b'data']
-
-    # Validate headers and params passed to ws_connect
-    captured = holder["session"].captured
-    assert captured["url"] == "wss://example.org/ws"
-    assert captured["params"] == {"p": "9"}
-    headers = captured["headers"]
-    assert headers["Authorization"] == "Bearer TOKEN-ASYNC"
-    assert headers["X-Extra"] == "Z"
-
-    # Two ACKs were sent (for TEXT and BINARY)
-    assert captured["acks"] == [{"ok": "true"}]
-
-
-def test_websocket_generator_async_error_raises(monkeypatch):
-    import aiohttp
-    import restreamsolutions.communicator as comm_module
-
-    class DummyWS:
-        def __init__(self, seq):
-            self._iter = iter(seq)
-
-        async def receive(self):
-            try:
-                return next(self._iter)
-            except StopIteration:
-                return types.SimpleNamespace(type=aiohttp.WSMsgType.CLOSED, data=None)
-
-    class DummyWebsocketSession:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def ws_connect(self, url, headers=None, params=None):
-            seq = [types.SimpleNamespace(type=aiohttp.WSMsgType.ERROR, data=None)]
-            ws = DummyWS(seq)
-
-            class _Ctx:
-                async def __aenter__(self_inner):
-                    return ws
-
-                async def __aexit__(self_inner, exc_type, exc, tb):
-                    return False
-
-            return _Ctx()
-
-    monkeypatch.setattr(comm_module.aiohttp, "ClientSession", DummyWebsocketSession)
-
-    async def run():
-        gen = comm_module.Communicator.websocket_generator_async(
-            url="wss://example.org/ws",
-            auth_token="T",
+        updates = asyncio.run(_collect(_ws_url(api, SITE_WS_PATH), additional_headers=headers))
+        data = asyncio.run(
+            _collect(_ws_url(api, SITE_DATA_WS_PATH), params={'session_key': 'abc'}, get_nested_key='message')
         )
-        with pytest.raises(comm_module.WebsocketError):
-            async for _ in gen:
-                pass
+    else:
+        updates = list(Communicator.websocket_generator(_ws_url(api, SITE_WS_PATH), additional_headers=headers))
+        data = list(
+            Communicator.websocket_generator(
+                _ws_url(api, SITE_DATA_WS_PATH), params={'session_key': 'abc'}, get_nested_key='message'
+            )
+        )
 
-    asyncio.run(run())
-
-
-# --- Authorization tests ---
-
-
-def _reset_auth_singleton():
-    # Ensure the singleton internal state is clean for each test
-    auth = Authorization()
-    auth._tokens = {}
-    return auth
-
-
-def test_authorization_create_payload_from_params_and_env(monkeypatch):
-    _reset_auth_singleton()
-    # When params are provided, env is ignored
-    payload = Authorization()._create_payload(client_id='cid', client_secret='sec')
-    assert payload == {
-        'client_id': 'cid',
-        'client_secret': 'sec',
-        'grant_type': 'client_credentials',
-    }
-
-    # When params are missing, take from env
-    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ENV_ID')
-    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'ENV_SEC')
-    cliend_id, client_secret = Authorization()._select_client_id_and_secret()
-    payload2 = Authorization()._create_payload(cliend_id, client_secret)
-    assert payload2['client_id'] == 'ENV_ID'
-    assert payload2['client_secret'] == 'ENV_SEC'
-    assert payload2['grant_type'] == 'client_credentials'
-
-    # When nothing is provided, raise CredentialsError
-    monkeypatch.delenv('RESTREAM_CLIENT_ID', raising=False)
-    monkeypatch.delenv('RESTREAM_CLIENT_SECRET', raising=False)
-    from restreamsolutions.exceptions import CredentialsError
-
-    with pytest.raises(CredentialsError):
-        cliend_id, client_secret = Authorization()._select_client_id_and_secret()
-        Authorization()._create_payload(cliend_id, client_secret)
+    assert updates == [{'k': 1}, {'k': 2}, {'k': 3}, {'k': 4}]
+    assert data == [{'v': 1}, {'v': 2}, {'v': 3}]
+    updates_ws, data_ws = api.websockets
+    assert updates_ws.headers['Authorization'] == f'Bearer {Authorization().get_access_token()}'
+    assert updates_ws.headers['X-Test'] == 'yes'
+    assert data_ws.param('session_key') == 'abc'
 
 
-def test_authorization_parse_response_success_and_errors():
-    _reset_auth_singleton()
+@pytest.mark.parametrize('is_async', [False, True], ids=['sync', 'async'])
+def test_websocket_handshake_errors_are_mapped(api, is_async):
+    """A rejected WebSocket handshake is mapped to SDK exceptions; HTTP 403 is reported as AuthError."""
 
-    class RespOK:
-        def json(self):
-            return {'access_token': 'tok', 'expires_in': 3600}
+    def connect(url):
+        """Open the WebSocket through the sync or the async generator and read it to the end.
 
-    token, exp = Authorization()._parse_response(RespOK())
-    assert token == 'tok'
-    assert isinstance(exp, int) and exp == 3600
+        Args:
+            url: WebSocket URL to connect to.
 
-    # Missing fields -> APICompatibilityError
-    class RespMissing:
-        def json(self):
-            return {'access_token': 'tok'}
+        Returns:
+            The list of received messages.
+        """
+        if is_async:
 
-    with pytest.raises(APICompatibilityError):
-        Authorization()._parse_response(RespMissing())
+            async def _collect():
+                """Read the async WebSocket generator to the end.
 
-    # Invalid JSON -> ServerError
-    class RespInvalid:
-        def json(self):
-            # Simulate json parsing failure
-            raise json.JSONDecodeError('msg', 'doc', 0)
+                Returns:
+                    The list of received messages.
+                """
+                return [item async for item in Communicator.websocket_generator_async(url)]
 
-    with pytest.raises(ServerError):
-        Authorization()._parse_response(RespInvalid())
+            return asyncio.run(_collect())
+        return list(Communicator.websocket_generator(url))
 
+    token = Authorization().get_access_token()
 
-def test_authorization_build_auth_url_uses_env_host(monkeypatch):
-    _reset_auth_singleton()
-    base = 'https://example.com'
-    monkeypatch.setenv('RESTREAM_HOST', base)
-    expected = base.rstrip('/') + Authorization._api_url_auth
-    assert Authorization._build_auth_url() == expected
+    # The server answers 403 both for a missing access and for an invalid token, so both are AuthError
+    api.forbidden_ids.add(SITE_ID)
+    with pytest.raises(AuthError) as excinfo:
+        connect(_ws_url(api, SITE_WS_PATH))
+    assert not isinstance(excinfo.value, ForbiddenError)
+    assert 'HTTP 403' in str(excinfo.value)
+    assert excinfo.value.rejected_token == token
 
+    api.forbidden_ids.clear()
+    api.revoke_tokens()
+    with pytest.raises(AuthError) as excinfo:
+        connect(_ws_url(api, SITE_WS_PATH))
+    assert excinfo.value.rejected_token == token
 
-def test_get_access_token_posts_and_returns_token(monkeypatch):
-    auth = _reset_auth_singleton()
-    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
-    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
-
-    called = {}
-
-    def fake_post(u, data=None, timeout=None):
-        called['url'] = u
-        called['data'] = dict(data) if data is not None else None
-        # Use helper to create a realistic Response
-        return make_requests_response(200, {'access_token': 'token', 'expires_in': 3600})
-
-    monkeypatch.setattr(requests, 'post', fake_post)
-
-    token = auth.get_access_token()
-    assert token == 'token'
-    assert 'url' in called and 'data' in called
-    assert called['data']['client_id'] == 'ID'
-    assert called['data']['client_secret'] == 'SECRET'
-    assert called['data']['grant_type'] == 'client_credentials'
-    assert isinstance(called['url'], str) and called['url'].endswith(Authorization._api_url_auth)
-
-
-def test_get_access_token_uses_cache_when_not_expired(monkeypatch):
-    auth = _reset_auth_singleton()
-    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
-    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
-    # Preload cache and set far future expiry so _need_request returns False
-    auth._tokens['ID'] = RestreamToken(
-        token='CACHED', expires_in=10**9, last_update=datetime.datetime.now(tz=datetime.timezone.utc).timestamp()
-    )
-
-    def fail_post(*args, **kwargs):
-        raise AssertionError('requests.post should not be called when cache is valid')
-
-    monkeypatch.setattr(requests, 'post', fail_post)
-
-    assert auth.get_access_token() == 'CACHED'
-
-
-def test_get_access_token_force_refresh(monkeypatch):
-    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
-    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
-    auth = _reset_auth_singleton()
-    # Preload cache that would otherwise be valid
-    auth._restream_auth_token = 'OLD'
-    auth._expires_in = 10**9
-
-    calls = {'n': 0}
-
-    def fake_post(u, data=None, timeout=None):
-        calls['n'] += 1
-        return make_requests_response(200, {'access_token': 'NEW', 'expires_in': 3600})
-
-    monkeypatch.setattr(requests, 'post', fake_post)
-
-    tok = auth.get_access_token(force=True)
-    assert tok == 'NEW'
-    assert calls['n'] == 1
-
-
-@pytest.mark.asyncio
-async def test_aget_access_token_posts_and_returns_token_async(monkeypatch):
-    auth = _reset_auth_singleton()
-    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
-    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
-
-    class Resp:
-        status_code = 200
-
-        def json(self):
-            return {'access_token': 'token', 'expires_in': 3600}
-
-        def raise_for_status(self):
-            return None
-
-    async def post_cb(u, data=None, **kwargs):
-        # Return our simple response object
-        return Resp()
-
-    # Reuse DummyAsyncClient defined above in this module
-    monkeypatch.setattr(httpx, 'AsyncClient', lambda *a, **k: DummyAsyncClient(get_cb=None, post_cb=post_cb))
-
-    token = await auth.aget_access_token()
-    assert token == 'token'
-
-
-@pytest.mark.asyncio
-async def test_aget_access_token_uses_cache_when_not_expired(monkeypatch):
-    auth = _reset_auth_singleton()
-    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
-    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
-    # Preload cache and set far future expiry so _need_request returns False
-    auth._tokens['ID'] = RestreamToken(
-        token='CACHED', expires_in=10**9, last_update=datetime.datetime.now(tz=datetime.timezone.utc).timestamp()
-    )
-
-    class FailingAsyncClient:
-        def __init__(self, *a, **k):
-            pass
-
-        async def __aenter__(self):
-            raise AssertionError('AsyncClient should not be entered when cache is valid')
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    monkeypatch.setattr(httpx, 'AsyncClient', FailingAsyncClient)
-
-    assert await auth.aget_access_token() == 'CACHED'
-
-
-@pytest.mark.asyncio
-async def test_aget_access_token_force_refresh(monkeypatch):
-    monkeypatch.setenv('RESTREAM_CLIENT_ID', 'ID')
-    monkeypatch.setenv('RESTREAM_CLIENT_SECRET', 'SECRET')
-    auth = _reset_auth_singleton()
-    auth._restream_auth_token = 'OLD'
-    auth._expires_in = 10**9
-
-    class Resp:
-        status_code = 200
-
-        def json(self):
-            return {'access_token': 'NEW', 'expires_in': 3600}
-
-        def raise_for_status(self):
-            return None
-
-    calls = {'n': 0}
-
-    async def post_cb(u, data=None, **kwargs):
-        calls['n'] += 1
-        return Resp()
-
-    monkeypatch.setattr(httpx, 'AsyncClient', lambda *a, **k: DummyAsyncClient(get_cb=None, post_cb=post_cb))
-
-    tok = await auth.aget_access_token(force=True)
-    assert tok == 'NEW'
-    assert calls['n'] == 1
+    # Other statuses keep their regular mapping
+    Authorization().get_access_token(force=True)
+    api.missing_ids.add(SITE_ID)
+    with pytest.raises(NotFoundError):
+        connect(_ws_url(api, SITE_WS_PATH))

@@ -22,10 +22,13 @@ class Site(BasePadSite):
       - id (str): Unique identifier of the site.
       - name (str): Site name.
       - date_created (datetime): Timezone-aware creation timestamp.
-      - latitude (int): Latitude in microdegrees.
-      - longitude (int): Longitude in microdegrees.
+      - latitude (float): Latitude in decimal degrees.
+      - longitude (float): Longitude in decimal degrees.
+      - formation_name (str): Name of the formation of the site (or of its pad); empty string if unknown.
       - lease_name (str): Lease name associated with the site.
       - operator_name (str): Operator name.
+      - crew (str | None): Name of the crew assigned to the site; None if no crew is assigned.
+      - division (str | None): Name of the division the site belongs to; None if no division is assigned.
       - metadata (dict): Additional metadata dictionary.
       - well_api (str): Well API number if available.
       - pad_id (int): Identifier of the parent Pad.
@@ -49,16 +52,21 @@ class Site(BasePadSite):
     _api_url_data_websocket: str = ENDPOINTS.data_site_websocket.value
     _api_url_instance_updates_websocket: str = ENDPOINTS.site_updates_websocket.value
     _api_url_changelog_updates_websocket: str = ENDPOINTS.site_changelog_updates_websocket.value
-    _api_url_pad_parameters: str = ENDPOINTS.site_parameters.value
+    _api_url_stages_aggregations: str = ENDPOINTS.stages_aggregations_site.value
+    _api_url_stages_aggregations_one: str = ENDPOINTS.stages_aggregations_site_one.value
 
     # These type hints are used by the BaseInterface class to perform automatic type conversion
     # when a new instance is created.
     name: str
     date_created: datetime
-    latitude: int
-    longitude: int
+    latitude: float
+    longitude: float
+    formation_name: str
     lease_name: str
     operator_name: str
+    # The API omits crew and division when they are not assigned
+    crew: str = None
+    division: str = None
     metadata: dict
     well_api: str
     pad_id: int
@@ -70,6 +78,66 @@ class Site(BasePadSite):
     fleet_id: int
     fleet_name: str
 
+    @staticmethod
+    def _build_site_filters(
+        complete: bool | None = None,
+        pad_pk: int | None = None,
+        well_api: str | None = None,
+        name_search: str | None = None,
+        formation_name: str | None = None,
+        pad_name: str | None = None,
+        latitude_gte: float | None = None,
+        latitude_lte: float | None = None,
+        longitude_gte: float | None = None,
+        longitude_lte: float | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        radius_miles: float | None = None,
+        fleet_id: int | None = None,
+        fleet_name: str | None = None,
+        **filters,
+    ) -> dict[str, Any]:
+        """Translate the named site filters into query parameters of the sites endpoint.
+
+        Args:
+            See get_models for the meaning of every filter.
+            **filters: Additional query parameters passed through as-is. The raw lat and long parameters
+                of the API are accepted as the center of the radius filter as well.
+
+        Returns:
+            A dict of query parameters without None values.
+
+        Raises:
+            ValueError: If only some of the radius filter values (center and radius_miles) are provided.
+        """
+        center_latitude = latitude if latitude is not None else filters.get('lat')
+        center_longitude = longitude if longitude is not None else filters.get('long')
+        radius_filter = (center_latitude, center_longitude, radius_miles)
+        provided_count = sum(value is not None for value in radius_filter)
+        if 0 < provided_count < 3:
+            raise ValueError('latitude (or lat), longitude (or long) and radius_miles must be provided together.')
+        named = {
+            'complete': complete,
+            'pad_pk': pad_pk,
+            'well_api': well_api,
+            'name_search': name_search,
+            'formation_name': formation_name,
+            'pad_name': pad_name,
+            'latitude_gte': latitude_gte,
+            'latitude_lte': latitude_lte,
+            'longitude_gte': longitude_gte,
+            'longitude_lte': longitude_lte,
+            'lat': latitude,
+            'long': longitude,
+            'radius_miles': radius_miles,
+            'fleet_id': fleet_id,
+            'fleet_name': fleet_name,
+        }
+        # Raw query parameters passed through filters (e.g. lat) must survive when the named value is not set
+        params = {key: value for key, value in filters.items() if value is not None}
+        params.update({key: value for key, value in named.items() if value is not None})
+        return params
+
     @classmethod
     def get_models(
         cls,
@@ -77,38 +145,75 @@ class Site(BasePadSite):
         as_dict=False,
         complete: bool | None = None,
         pad_pk: int | None = None,
+        well_api: str | None = None,
+        name_search: str | None = None,
+        formation_name: str | None = None,
+        pad_name: str | None = None,
+        latitude_gte: float | None = None,
+        latitude_lte: float | None = None,
+        longitude_gte: float | None = None,
+        longitude_lte: float | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        radius_miles: float | None = None,
+        fleet_id: int | None = None,
+        fleet_name: str | None = None,
         **filters,
     ) -> "list[Site] | list[dict]":
         """Fetch Site objects from the API.
 
-        Parameters:
+        Args:
             auth_token: Optional auth token used for API requests; if not provided,
-             RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
             as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
-            complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
-            pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
+            complete (bool | None): Filter sites by the completion status of their pad. None means no filtering.
+            pad_pk (int | None): Return only sites that belong to the pad with this id.
+            well_api (str | None): Return only the site with this well API number.
+            name_search (str | None): Fuzzy (trigram) search by site name.
+            formation_name (str | None): Filter by formation name (case-insensitive partial match).
+            pad_name (str | None): Filter by pad name (case-insensitive partial match).
+            latitude_gte (float | None): Minimum latitude in decimal degrees (bounding box filter).
+            latitude_lte (float | None): Maximum latitude in decimal degrees (bounding box filter).
+            longitude_gte (float | None): Minimum longitude in decimal degrees (bounding box filter).
+            longitude_lte (float | None): Maximum longitude in decimal degrees (bounding box filter).
+            latitude (float | None): Center latitude of the radius filter. Requires longitude and radius_miles.
+            longitude (float | None): Center longitude of the radius filter. Requires latitude and radius_miles.
+            radius_miles (float | None): Radius in miles around the center point. Requires latitude and longitude.
+            fleet_id (int | None): Filter sites by fleet identifier.
+            fleet_name (str | None): Filter sites by fleet name (case-insensitive partial match).
             **filters: Additional query parameters supported by the API.
-                Some supported filters include:
-                - fleet_id (int): Filter sites by fleet identifier.
-                - fleet_name (str): Filter sites by fleet name (case-insensitive contains).
 
         Returns:
             list[Site] | list[dict]: A list of Site objects (or dicts when as_dict=True).
 
         Raises:
+            ValueError: If only some of the radius filter values (center and radius_miles) are provided.
             AuthError: If authentication fails.
-            APICompatibilityError: If the endpoint is unavailable or the response format is not supported by
-                the current version of this package.
-            APIConcurrencyLimitError: If the API rate limit is reached.
-            HTTPError: For other non-2xx HTTP responses.
+            ForbiddenError: If the client has no access to the requested resource.
+            NotFoundError: If the endpoint does not exist.
+            APICompatibilityError: If the response format is not supported by the current version of this package.
+            APIConcurrencyLimitError: If the API concurrency limit is reached.
+            BadRequestError: For other non-2xx HTTP responses.
         """
-        return super().get_models(
-            auth_token=auth_token,
-            as_dict=as_dict,
+        site_filters = cls._build_site_filters(
             complete=complete,
             pad_pk=pad_pk,
+            well_api=well_api,
+            name_search=name_search,
+            formation_name=formation_name,
+            pad_name=pad_name,
+            latitude_gte=latitude_gte,
+            latitude_lte=latitude_lte,
+            longitude_gte=longitude_gte,
+            longitude_lte=longitude_lte,
+            latitude=latitude,
+            longitude=longitude,
+            radius_miles=radius_miles,
+            fleet_id=fleet_id,
+            fleet_name=fleet_name,
             **filters,
         )
+        return super().get_models(auth_token=auth_token, as_dict=as_dict, **site_filters)
 
     @classmethod
     async def aget_models(
@@ -117,43 +222,80 @@ class Site(BasePadSite):
         as_dict=False,
         complete: bool | None = None,
         pad_pk: int | None = None,
+        well_api: str | None = None,
+        name_search: str | None = None,
+        formation_name: str | None = None,
+        pad_name: str | None = None,
+        latitude_gte: float | None = None,
+        latitude_lte: float | None = None,
+        longitude_gte: float | None = None,
+        longitude_lte: float | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        radius_miles: float | None = None,
+        fleet_id: int | None = None,
+        fleet_name: str | None = None,
         **filters,
     ) -> "list[Site] | list[dict]":
         """Asynchronously fetch Site objects from the API.
 
-        Parameters:
+        Args:
             auth_token (str | None): Optional auth token used for API requests; if not provided,
-             RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variable will be used to create it.
+                RESTREAM_CLIENT_ID and RESTREAM_CLIENT_SECRET environment variables will be used to create it.
             as_dict (bool): When True, return plain dicts instead of Site instances. Default False.
-            complete (bool | None): Filter the received sites by the complete attribute. Defaults to None (no filtering).
-            pad_pk (int | None): Optional pad primary key to filter sites by a specific pad they belong to.
+            complete (bool | None): Filter sites by the completion status of their pad. None means no filtering.
+            pad_pk (int | None): Return only sites that belong to the pad with this id.
+            well_api (str | None): Return only the site with this well API number.
+            name_search (str | None): Fuzzy (trigram) search by site name.
+            formation_name (str | None): Filter by formation name (case-insensitive partial match).
+            pad_name (str | None): Filter by pad name (case-insensitive partial match).
+            latitude_gte (float | None): Minimum latitude in decimal degrees (bounding box filter).
+            latitude_lte (float | None): Maximum latitude in decimal degrees (bounding box filter).
+            longitude_gte (float | None): Minimum longitude in decimal degrees (bounding box filter).
+            longitude_lte (float | None): Maximum longitude in decimal degrees (bounding box filter).
+            latitude (float | None): Center latitude of the radius filter. Requires longitude and radius_miles.
+            longitude (float | None): Center longitude of the radius filter. Requires latitude and radius_miles.
+            radius_miles (float | None): Radius in miles around the center point. Requires latitude and longitude.
+            fleet_id (int | None): Filter sites by fleet identifier.
+            fleet_name (str | None): Filter sites by fleet name (case-insensitive partial match).
             **filters: Additional query parameters supported by the API.
-                Some supported filters include:
-                - fleet_id (int): Filter sites by fleet identifier.
-                - fleet_name (str): Filter sites by fleet name (case-insensitive contains).
 
         Returns:
             list[Site] | list[dict]: A list of Site objects (or dicts when as_dict=True).
 
         Raises:
+            ValueError: If only some of the radius filter values (center and radius_miles) are provided.
             AuthError: If authentication fails.
-            APICompatibilityError: If the endpoint is unavailable or the response format is not supported by
-                the current version of this package.
-            APIConcurrencyLimitError: If the API rate limit is reached.
-            HTTPError: For other non-2xx HTTP responses.
+            ForbiddenError: If the client has no access to the requested resource.
+            NotFoundError: If the endpoint does not exist.
+            APICompatibilityError: If the response format is not supported by the current version of this package.
+            APIConcurrencyLimitError: If the API concurrency limit is reached.
+            BadRequestError: For other non-2xx HTTP responses.
         """
-        return await super().aget_models(
-            auth_token=auth_token,
-            as_dict=as_dict,
+        site_filters = cls._build_site_filters(
             complete=complete,
             pad_pk=pad_pk,
+            well_api=well_api,
+            name_search=name_search,
+            formation_name=formation_name,
+            pad_name=pad_name,
+            latitude_gte=latitude_gte,
+            latitude_lte=latitude_lte,
+            longitude_gte=longitude_gte,
+            longitude_lte=longitude_lte,
+            latitude=latitude,
+            longitude=longitude,
+            radius_miles=radius_miles,
+            fleet_id=fleet_id,
+            fleet_name=fleet_name,
             **filters,
         )
+        return await super().aget_models(auth_token=auth_token, as_dict=as_dict, **site_filters)
 
     def get_state(self, as_dict: bool = False) -> Optional['State'] | Optional[dict[str, Any]]:
         """Fetch the current State object for this site.
 
-        Parameters:
+        Args:
             as_dict (bool): If True, return a plain dict instead of a State instance. Default False.
 
         Returns:
@@ -177,7 +319,7 @@ class Site(BasePadSite):
     async def aget_state(self, as_dict: bool = False) -> Optional['State'] | Optional[dict[str, Any]]:
         """Asynchronously fetch the current State object for this site.
 
-        Parameters:
+        Args:
             as_dict (bool): If True, return a plain dict instead of a State instance. Default False.
 
         Returns:
@@ -201,7 +343,7 @@ class Site(BasePadSite):
     def get_pad(self, as_dict: bool = False) -> Optional['Pad'] | Optional[dict[str, Any]]:
         """Fetch the parent Pad object this site belongs to.
 
-        Parameters:
+        Args:
             as_dict (bool): If True, return a plain dict instead of a Pad instance. Default False.
 
         Returns:
@@ -225,7 +367,7 @@ class Site(BasePadSite):
     async def aget_pad(self, as_dict: bool = False) -> Optional['Pad'] | Optional[dict[str, Any]]:
         """Asynchronously fetch the parent Pad object this site belongs to.
 
-        Parameters:
+        Args:
             as_dict (bool): If True, return a plain dict instead of a Pad instance. Default False.
 
         Returns:
@@ -249,7 +391,7 @@ class Site(BasePadSite):
     def _extract_site_measurement_sources(self, pad_measurement_sources: dict) -> dict:
         """Internal helper to filter pad measurement_sources to only those attached to this site.
 
-        Parameters:
+        Args:
             pad_measurement_sources (dict): Metadata returned by Pad.get_measurement_sources_metadata().
 
         Returns:
@@ -334,7 +476,7 @@ class Site(BasePadSite):
         data.data_fetcher is a lazy synchronous generator. Iterate over it to get timestamped data
         items one by one. data.save(path: str, overwrite: bool = False) will save all the data to a JSON file.
 
-        Parameters:
+        Args:
             start_datetime (datetime | None): Inclusive start; must be timezone-aware.
             end_datetime (datetime | None): Inclusive end; must be timezone-aware.
             stage_number (int | None): Optional stage number to filter by (requires stage_name_filter; see below).
@@ -400,7 +542,7 @@ class Site(BasePadSite):
         data.data_fetcher is a lazy asynchronous generator. Iterate over it to get timestamped data items one by one.
         data.asave(path: str, overwrite: bool = False) will asynchronously save all the data to a JSON file.
 
-        Parameters:
+        Args:
             start_datetime (datetime | None): Inclusive start; must be timezone-aware.
             end_datetime (datetime | None): Inclusive end; must be timezone-aware.
             stage_number (int | None): Optional stage number to filter by (requires stage_name_filter; see below).
@@ -469,7 +611,7 @@ class Site(BasePadSite):
         Works with the same filters as get_data. If filters are provided, the stream first yields
         the historical data matching the filters, then continues with real-time updates.
 
-        Parameters:
+        Args:
             session_key (str | None): Optional session identifier to resume an existing stream.
             restart_on_error (bool): If True, the Data will auto-reconnect on errors.
             restart_on_close (bool): If True, the Data will also restart when the stream closes normally.
@@ -536,7 +678,7 @@ class Site(BasePadSite):
         Works with the same filters as aget_data. If filters are provided, the stream first yields
         the historical data matching the filters, then continues with real-time updates.
 
-        Parameters:
+        Args:
             session_key (str | None): Optional session identifier to resume an existing stream.
             restart_on_error (bool): If True, the DataAsync will auto-reconnect on errors.
             restart_on_close (bool): If True, the DataAsync will also restart when the stream closes normally.
@@ -587,7 +729,7 @@ class Site(BasePadSite):
         """Create a Data object that provides a lazy WebSocket stream of real-time
         updates for this Site.
 
-        Parameters:
+        Args:
             as_dict (bool): Controls the type of yielded items.
                 - False (default): each item is converted to a Site instance.
                 - True: each item is returned as a raw dict payload.
@@ -634,7 +776,7 @@ class Site(BasePadSite):
         """Create a DataAsync object that provides a lazy WebSocket stream of
         real-time updates for this Site (async).
 
-        Parameters:
+        Args:
             as_dict (bool): Controls the type of yielded items.
                 - False (default): each item is converted to a Site instance.
                 - True: each item is returned as a raw dict payload.
