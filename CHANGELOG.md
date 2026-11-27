@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.5.1] - 2026-11-27
+
+### Documentation
+
+- Updated the documentation of the real-time measurement streams (`get_realtime_measurements_data`/
+  `aget_realtime_measurements_data`) to match the current server behavior.
+
 ## [v0.5.0] - 2026-10-20
 
 ### New Features
