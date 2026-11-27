@@ -564,11 +564,15 @@ class BasePadSite(BaseInterface):
         """Open a WebSocket stream of real-time measurements (sync).
 
         You can use the same named parameters for filters as those used in the get_data method of the current instance
-        (Site or Pad). In this case, the WebSocket will first return historical data according to the specified
-        parameters and then start sending new real-time data.
+        (Site or Pad). History is sent only when start_datetime is given: up to the moment of connection, together
+        with real-time data, or only the start_datetime..end_datetime range when end_datetime is given too. Every
+        reconnection sends the history again. Stage filters are ignored; resolution, aggregation and the fill options
+        apply only to the history. measurement_sources_names takes a single name: an unknown name or a list makes the
+        server refuse the stream (AuthError).
 
         Args:
-            session_key: Optional session identifier to resume/associate a stream.
+            session_key: Optional session identifier to resume/associate a stream. The server keeps the queue of a
+                session for 60 seconds after the connection closes.
             restart_on_error: If True, the returned Data instance will automatically attempt to reconnect
                 to the server if an error occurs.
             restart_on_close: If True, the Data instance will also recreate the underlying generator when
@@ -605,11 +609,15 @@ class BasePadSite(BaseInterface):
         """Open a WebSocket stream of real-time measurements (async).
 
         You can use the same named parameters for filters as those used in the aget_data method of the current instance
-        (Site or Pad). In this case, the WebSocket will first return historical data according to the specified
-        parameters and then start sending new real-time data.
+        (Site or Pad). History is sent only when start_datetime is given: up to the moment of connection, together
+        with real-time data, or only the start_datetime..end_datetime range when end_datetime is given too. Every
+        reconnection sends the history again. Stage filters are ignored; resolution, aggregation and the fill options
+        apply only to the history. measurement_sources_names takes a single name: an unknown name or a list makes the
+        server refuse the stream (AuthError).
 
         Args:
-            session_key: Optional session identifier to resume/associate a stream.
+            session_key: Optional session identifier to resume/associate a stream. The server keeps the queue of a
+                session for 60 seconds after the connection closes.
             restart_on_error: If True, the returned DataAsync instance will automatically attempt to reconnect
                 to the server if an error occurs.
             restart_on_close: If True, the DataAsync instance will also recreate the underlying async generator when
