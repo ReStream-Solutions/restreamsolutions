@@ -738,7 +738,7 @@ Common behavior and tips:
 - All methods return lazy `Data`/`DataAsync` objects; read incoming messages by iterating over `data_fetcher`.
 - Use `get_*` for synchronous code, and `aget_*` for asynchronous code.
 - Streams can be saved to files using the `save(...)`/`asave(...)` method on the returned `Data`/`DataAsync`.
-- For measurement streams, a `session_key` is also returned so that you can resume reading the queue after a process restart — details are provided in the dedicated section below.
+- For measurement streams, a `session_key` is also returned so that you can resume reading the queue after a quick process restart — details are provided in the dedicated section below.
 
 Detailed subsections for each real-time option are provided below.
 
@@ -801,39 +801,55 @@ Use the following methods to open a WebSocket stream with measurements for a Sit
 - Pad: `get_realtime_measurements_data()` and `aget_realtime_measurements_data()`
 - Site: `get_realtime_measurements_data()` and `aget_realtime_measurements_data()`
 
-These methods accept the same filter parameters as `get_data()`/`aget_data()`.
+These methods accept the same filter parameters as `get_data()`/`aget_data()`. Historical data is sent only when
+`start_datetime` is given:
+- Without `start_datetime`: only fresh real-time updates.
+- With `start_datetime` only: the history up to the moment of connection, with real-time updates in parallel. The two
+may interleave, and records near the moment of connection may come twice.
+- With `start_datetime` and `end_datetime`: only that history. The connection then stays open without further messages.
 
-Important behavior of filters:
-- If you DO pass any filters (for example start_datetime/end_datetime, fields, stage filters, etc.), the stream will
-first replay the historical data that matches those filters and then continue with real-time updates.
-- If you DO NOT pass any filters, only fresh real-time updates will be delivered. No historical backlog will be sent.
+Historical and real-time records use the same field names and units (`si_units`) as `get_data()`. On a Pad, every record
+comes per site with `site_id`, whatever `is_routed` is; `is_routed` only picks the SimulRun fields: `True` gives the
+values routed to each site (`clean_rate`), `False` the measurement source values (`M1_clean_rate`).
+
+Differences from `get_data()`:
+- `stage_number` and `stage_name_filter` are ignored: records are selected by time only.
+- `resolution`, `aggregation` and the fill options apply only to the history; real-time records keep their sampling.
+- `measurement_sources_names` takes a single name. For an unknown name or a list of names (as for any parameters the
+server rejects) the connection is refused, and the SDK raises `AuthError`.
 
 ```python
 from datetime import datetime, timezone
-from restreamsolutions import Pad, StageNameFilters
+from restreamsolutions import Pad
 
 pad = Pad(id=681)
 
-# With filters: first get historical, then live
+# History since start_datetime, then live updates
 stream, session_key = pad.get_realtime_measurements_data(
     start_datetime=datetime(2025, 9, 9, tzinfo=timezone.utc),
-    end_datetime=datetime(2025, 9, 9, minute=1, tzinfo=timezone.utc),
     is_routed=True,
-    stage_name_filter=StageNameFilters.FRAC,
     fields=["down_hole_pressure", "slurry_rate"]
 )
 for item in stream.data_fetcher:
     print(item)
 
-# Without filters: live only (no historical replay)
-live_only_stream, live_session_key = pad.get_realtime_measurements_data()
+# Closed time range: history only, no live updates
+history_stream, _ = pad.get_realtime_measurements_data(
+    start_datetime=datetime(2025, 9, 9, tzinfo=timezone.utc),
+    end_datetime=datetime(2025, 9, 9, minute=1, tzinfo=timezone.utc),
+)
+
+# Without start_datetime: live only (no historical replay)
+live_only_stream, live_session_key = pad.get_realtime_measurements_data(fields=["slurry_rate"])
 for item in live_only_stream.data_fetcher:
     print(item)
 ```
 
 **VERY IMPORTANT: session_key usage**
 - The SDK maintains resilient WebSocket connections and will automatically reuse the same session_key to continue reading from the same message queue after transient network errors or normal closes (when restart flags are enabled).
-- If your whole Python process crashes or is restarted, you may want to resume from where you left off to avoid missing updates. To do so, persist the session_key returned as the second value from the method call (e.g., `data, session_key = pad.get_realtime_measurements_data(...)`) in a durable store (database, etc.), and supply it on the next start.
+- The server keeps a session's message queue for 60 seconds after the connection closes. Real-time updates missed during a shorter break are delivered after reconnecting; after a longer one they are lost, unless the stream has `start_datetime`.
+- Every reconnection replays the history from `start_datetime` again, so expect repeated records and de-duplicate them by `site_id` and `timestamp`.
+- To resume after your Python process crashes or restarts, persist the session_key (the second value returned, e.g. `data, session_key = pad.get_realtime_measurements_data(...)`) in a durable store and pass it on the next start, within those 60 seconds.
 - **Never create multiple concurrent connections that use the same session_key**. Doing so can lead to incorrect results or duplicated messages for each connected client.
 
 ## Error handling and retries

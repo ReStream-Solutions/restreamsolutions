@@ -608,26 +608,28 @@ class Site(BasePadSite):
     ) -> Tuple[Data, str]:
         """Open a WebSocket stream of real-time measurements for this Site (sync).
 
-        Works with the same filters as get_data. If filters are provided, the stream first yields
-        the historical data matching the filters, then continues with real-time updates.
+        Works with the same filters as get_data. History is sent only when start_datetime is given: up to the moment
+        of connection, together with real-time updates, or only the start_datetime..end_datetime range when
+        end_datetime is given too. Every reconnection sends the history again.
 
         Args:
-            session_key (str | None): Optional session identifier to resume an existing stream.
+            session_key (str | None): Optional session identifier to resume an existing stream. The server keeps the
+                queue of a session for 60 seconds after the connection closes.
             restart_on_error (bool): If True, the Data will auto-reconnect on errors.
             restart_on_close (bool): If True, the Data will also restart when the stream closes normally.
             start_datetime (datetime | None): Inclusive start; must be timezone-aware.
             end_datetime (datetime | None): Inclusive end; must be timezone-aware.
-            stage_number (int | None): Optional stage number to filter by (requires stage_name_filter; see below).
-            stage_name_filter (StageNameFilters | None): Filter for stage names (frac, wireline, etc.).
-            resolution (DataResolutions): Sampling resolution of the output series (seconds, minutes, hours, etc.).
-            aggregation (DataAggregations | None): Optional aggregation to apply.
+            stage_number (int | None): Ignored: the stream selects records by time only.
+            stage_name_filter (StageNameFilters | None): Ignored by the stream.
+            resolution (DataResolutions): Resolution of the historical records; real-time records keep their sampling.
+            aggregation (DataAggregations | None): Optional aggregation of the historical records.
             fields (str | list[str] | None): Optional fields filter. Use get_fields_metadata() to
                 discover all available fields for this site.
-            si_units (bool): If True, values are converted to SI units.
+            si_units (bool): If True, historical and real-time values are in SI units; otherwise in imperial units.
             fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
                 to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
                 to fill missing values backward before the next known value. If provided, resolution must be
-                DataResolutions.SECOND and aggregation must be None.
+                DataResolutions.SECOND and aggregation must be None. Applies to historical records only.
             fill_data_limit (int | None): Required when fill_data_method is provided. Maximum number of seconds to fill
                 per gap: for FORWARD_FILL this applies after a known value; for BACKWARD_FILL this applies before a
                 known value. Has no effect if fill_data_method is not provided. Must be a positive integer.
@@ -675,26 +677,28 @@ class Site(BasePadSite):
     ) -> Tuple[DataAsync, str]:
         """Open a WebSocket stream of real-time measurements for this Site (async).
 
-        Works with the same filters as aget_data. If filters are provided, the stream first yields
-        the historical data matching the filters, then continues with real-time updates.
+        Works with the same filters as aget_data. History is sent only when start_datetime is given: up to the moment
+        of connection, together with real-time updates, or only the start_datetime..end_datetime range when
+        end_datetime is given too. Every reconnection sends the history again.
 
         Args:
-            session_key (str | None): Optional session identifier to resume an existing stream.
+            session_key (str | None): Optional session identifier to resume an existing stream. The server keeps the
+                queue of a session for 60 seconds after the connection closes.
             restart_on_error (bool): If True, the DataAsync will auto-reconnect on errors.
             restart_on_close (bool): If True, the DataAsync will also restart when the stream closes normally.
             start_datetime (datetime | None): Inclusive start; must be timezone-aware.
             end_datetime (datetime | None): Inclusive end; must be timezone-aware.
-            stage_number (int | None): Optional stage number to filter by (requires stage_name_filter; see below).
-            stage_name_filter (StageNameFilters | None): Filter for stage names (frac, wireline, etc.).
-            resolution (DataResolutions): Sampling resolution of the output series (seconds, minutes, hours, etc.).
-            aggregation (DataAggregations | None): Optional aggregation to apply.
+            stage_number (int | None): Ignored: the stream selects records by time only.
+            stage_name_filter (StageNameFilters | None): Ignored by the stream.
+            resolution (DataResolutions): Resolution of the historical records; real-time records keep their sampling.
+            aggregation (DataAggregations | None): Optional aggregation of the historical records.
             fields (str | list[str] | None): Optional fields filter. Use aget_fields_metadata() to
                 discover all available fields for this site.
-            si_units (bool): If True, values are converted to SI units.
+            si_units (bool): If True, historical and real-time values are in SI units; otherwise in imperial units.
             fill_data_method (DataFillMethods | None): Optional gap-filling method. Use DataFillMethods.FORWARD_FILL
                 to fill missing values forward after the last known value, or DataFillMethods.BACKWARD_FILL
                 to fill missing values backward before the next known value. If provided, resolution must be
-                DataResolutions.SECOND and aggregation must be None.
+                DataResolutions.SECOND and aggregation must be None. Applies to historical records only.
             fill_data_limit (int | None): Required when fill_data_method is provided. Maximum number of seconds to fill
                 per gap: for FORWARD_FILL this applies after a known value; for BACKWARD_FILL this applies before a
                 known value. Has no effect if fill_data_method is not provided. Must be a positive integer.
